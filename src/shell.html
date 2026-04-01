@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a0f1a" />
+  <title>Tactical RPG Engine</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-deep:    #060c14;
+      --bg-panel:   rgba(10, 18, 30, 0.97);
+      --accent:     #00e5ff;
+      --accent-dim: #0a3040;
+      --gold:       #ffd740;
+      --text:       #c8dff0;
+      --text-dim:   #4a6070;
+      --player:     #4fc3f7;
+      --enemy:      #ef5350;
+      --border:     rgba(0, 229, 255, 0.18);
+      --panel-h:    clamp(28px, 5vh, 44px);
+    }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      overflow: hidden;
+      touch-action: none;
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.013) 2px, rgba(0,229,255,0.013) 4px);
+    }
+
+    /* Scanline overlay for cyberpunk aesthetic */
+    html::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.04) 3px,
+        rgba(0, 0, 0, 0.04) 4px
+      );
+    }
+
+    #game-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    #header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      height: var(--panel-h);
+      min-height: 28px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Accent glow line at bottom of header */
+    #header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.6;
+    }
+    #header .logo {
+      font-size: clamp(9px, 2.2vw, 13px);
+      font-weight: bold;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #header .logo span { color: var(--gold); }
+    #header .legend {
+      display: flex;
+      gap: 10px;
+      font-size: clamp(8px, 1.8vw, 10px);
+      color: var(--text-dim);
+    }
+    #header .legend .dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-right: 3px;
+      vertical-align: middle;
+    }
+
+    /* Map select button */
+    #map-select-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: clamp(8px, 1.8vw, 10px);
+      padding: 2px 8px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      border-radius: 2px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    #map-select-btn:hover, #map-select-btn:active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    /* ── Canvas container ────────────────────────────────────── */
+    #canvas-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      background: #050a10;
+      box-shadow: inset 0 0 60px rgba(0,0,0,0.8);
+    }
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: crosshair;
+      max-width: 100%;
+      max-height: 100%;
+      filter: drop-shadow(0 0 14px rgba(0,180,255,0.12));
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    #footer {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 0 12px;
+      height: var(--panel-h);
+      min-height: 28px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      font-size: clamp(8px, 1.8vw, 10px);
+      color: var(--text-dim);
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Accent glow line at top of footer */
+    #footer::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+    #footer .hint {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    #footer .key {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid var(--text-dim);
+      border-radius: 2px;
+      font-size: clamp(7px, 1.6vw, 9px);
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+    }
+    #footer .terrain-key {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #footer .swatch {
+      width: 9px; height: 9px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    /* ── End overlay ─────────────────────────────────────────── */
+    #end-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(6px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 100;
+    }
+    #end-overlay #end-title {
+      font-size: clamp(28px, 8vw, 60px);
+      font-weight: bold;
+      letter-spacing: 0.3em;
+      text-shadow: 0 0 40px currentColor;
+      animation: pulse-glow 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-glow { 0%,100%{opacity:1} 50%{opacity:0.65} }
+    #end-overlay #end-message {
+      font-size: clamp(10px, 2.5vw, 14px);
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+    #end-overlay button {
+      margin-top: 10px;
+      padding: 10px 28px;
+      min-height: 44px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: clamp(11px, 2.5vw, 13px);
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    #end-overlay button:hover, #end-overlay button:active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* ── Responsive: small screens ───────────────────────────── */
+    @media (max-width: 420px) {
+      #header .legend { display: none; }
+    }
+    @media (max-width: 360px) {
+      #footer .terrain-key { display: none; }
+      #footer .hint:last-of-type { display: none; }
+    }
+    @media (max-height: 500px) {
+      :root { --panel-h: 26px; }
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="game-wrapper">
+  <header id="header">
+    <div class="logo">Tactical<span>RPG</span></div>
+    <div class="legend">
+      <span><span class="dot" style="background:#4fc3f7"></span>Player</span>
+      <span><span class="dot" style="background:#ef5350"></span>Enemy</span>
+      <span><span class="dot" style="background:#ffd740"></span>Active</span>
+    </div>
+    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP ▸</button>
+    <button id="undo-move-btn" onclick="MovementSystem.undoMove()" style="
+      display:none;
+      background:transparent;
+      border:1px solid var(--gold);
+      color:var(--gold);
+      font-family:inherit;
+      font-size:clamp(8px,1.8vw,10px);
+      padding:2px 8px;
+      cursor:pointer;
+      letter-spacing:0.08em;
+      border-radius:2px;
+      transition:background 0.15s,color 0.15s;
+      white-space:nowrap;
+    ">↩ UNDO</button>
+  </header>
+
+  <div id="canvas-container">
+    <canvas id="game-canvas" aria-label="Tactical RPG game grid"></canvas>
+    <div id="end-overlay" role="dialog" aria-modal="true">
+      <div id="end-title">VICTORY</div>
+      <div id="end-message">All enemies defeated!</div>
+      <button onclick="location.reload()">&#9654; RESTART</button>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div class="hint"><span class="key">TAP</span> Select unit</div>
+    <div class="hint"><span class="key">TAP</span> Tile to move</div>
+    <div class="terrain-key">
+      <span><span class="swatch" style="background:#1a2634;border:1px solid #2a3f55"></span>Normal</span>
+      <span><span class="swatch" style="background:#223344;border:1px solid #2a3f55"></span>High</span>
+      <span><span class="swatch" style="background:#0a1f35;border:1px solid #2a3f55"></span>Water</span>
+      <span><span class="swatch" style="background:#0d1117;border:1px solid #2a3f55"></span>Rock</span>
+    </div>
+  </footer>
+</div>
+
