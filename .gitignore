@@ -1,0 +1,12 @@
+# Generated output — built by build.js on every push via GitHub Actions
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
