@@ -1,4 +1,4 @@
-name: Build and Commit
+name: Build, Commit, and Deploy
 
 on:
   push:
@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies (if needed)
         run: |
@@ -29,13 +29,19 @@ jobs:
       - name: Run build
         run: node build.js
 
-      - name: Commit and push dist
+      - name: Copy build to docs
+        run: |
+          rm -rf docs
+          mkdir docs
+          cp -r dist/* docs/
+
+      - name: Commit and push docs
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add dist
+          git add docs
 
-          git diff --cached --quiet || git commit -m "Auto-build dist"
+          git diff --cached --quiet || git commit -m "Auto-build docs"
 
           git push
