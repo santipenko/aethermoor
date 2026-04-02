@@ -1,0 +1,4050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a0f1a" />
+  <title>Tactical RPG Engine</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-deep:    #060c14;
+      --bg-panel:   rgba(10, 18, 30, 0.97);
+      --accent:     #00e5ff;
+      --accent-dim: #0a3040;
+      --gold:       #ffd740;
+      --text:       #c8dff0;
+      --text-dim:   #4a6070;
+      --player:     #4fc3f7;
+      --enemy:      #ef5350;
+      --border:     rgba(0, 229, 255, 0.18);
+      --panel-h:    clamp(28px, 5vh, 44px);
+    }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      overflow: hidden;
+      touch-action: none;
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.013) 2px, rgba(0,229,255,0.013) 4px);
+    }
+
+    /* Scanline overlay for cyberpunk aesthetic */
+    html::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.04) 3px,
+        rgba(0, 0, 0, 0.04) 4px
+      );
+    }
+
+    #game-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    #header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      height: var(--panel-h);
+      min-height: 28px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Accent glow line at bottom of header */
+    #header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.6;
+    }
+    #header .logo {
+      font-size: clamp(9px, 2.2vw, 13px);
+      font-weight: bold;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #header .logo span { color: var(--gold); }
+    #header .legend {
+      display: flex;
+      gap: 10px;
+      font-size: clamp(8px, 1.8vw, 10px);
+      color: var(--text-dim);
+    }
+    #header .legend .dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-right: 3px;
+      vertical-align: middle;
+    }
+
+    /* Map select button */
+    #map-select-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: clamp(8px, 1.8vw, 10px);
+      padding: 2px 8px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      border-radius: 2px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    #map-select-btn:hover, #map-select-btn:active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    /* ── Canvas container ────────────────────────────────────── */
+    #canvas-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      background: #050a10;
+      box-shadow: inset 0 0 60px rgba(0,0,0,0.8);
+    }
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: crosshair;
+      max-width: 100%;
+      max-height: 100%;
+      filter: drop-shadow(0 0 14px rgba(0,180,255,0.12));
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    #footer {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 0 12px;
+      height: var(--panel-h);
+      min-height: 28px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      font-size: clamp(8px, 1.8vw, 10px);
+      color: var(--text-dim);
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Accent glow line at top of footer */
+    #footer::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+    #footer .hint {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    #footer .key {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid var(--text-dim);
+      border-radius: 2px;
+      font-size: clamp(7px, 1.6vw, 9px);
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+    }
+    #footer .terrain-key {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #footer .swatch {
+      width: 9px; height: 9px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    /* ── End overlay ─────────────────────────────────────────── */
+    #end-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(6px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 100;
+    }
+    #end-overlay #end-title {
+      font-size: clamp(28px, 8vw, 60px);
+      font-weight: bold;
+      letter-spacing: 0.3em;
+      text-shadow: 0 0 40px currentColor;
+      animation: pulse-glow 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-glow { 0%,100%{opacity:1} 50%{opacity:0.65} }
+    #end-overlay #end-message {
+      font-size: clamp(10px, 2.5vw, 14px);
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+    #end-overlay button {
+      margin-top: 10px;
+      padding: 10px 28px;
+      min-height: 44px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: clamp(11px, 2.5vw, 13px);
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    #end-overlay button:hover, #end-overlay button:active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* ── Responsive: small screens ───────────────────────────── */
+    @media (max-width: 420px) {
+      #header .legend { display: none; }
+    }
+    @media (max-width: 360px) {
+      #footer .terrain-key { display: none; }
+      #footer .hint:last-of-type { display: none; }
+    }
+    @media (max-height: 500px) {
+      :root { --panel-h: 26px; }
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="game-wrapper">
+  <header id="header">
+    <div class="logo">Tactical<span>RPG</span></div>
+    <div class="legend">
+      <span><span class="dot" style="background:#4fc3f7"></span>Player</span>
+      <span><span class="dot" style="background:#ef5350"></span>Enemy</span>
+      <span><span class="dot" style="background:#ffd740"></span>Active</span>
+    </div>
+    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP ▸</button>
+    <button id="undo-move-btn" onclick="MovementSystem.undoMove()" style="
+      display:none;
+      background:transparent;
+      border:1px solid var(--gold);
+      color:var(--gold);
+      font-family:inherit;
+      font-size:clamp(8px,1.8vw,10px);
+      padding:2px 8px;
+      cursor:pointer;
+      letter-spacing:0.08em;
+      border-radius:2px;
+      transition:background 0.15s,color 0.15s;
+      white-space:nowrap;
+    ">↩ UNDO</button>
+  </header>
+
+  <div id="canvas-container">
+    <canvas id="game-canvas" aria-label="Tactical RPG game grid"></canvas>
+    <div id="end-overlay" role="dialog" aria-modal="true">
+      <div id="end-title">VICTORY</div>
+      <div id="end-message">All enemies defeated!</div>
+      <button onclick="location.reload()">&#9654; RESTART</button>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div class="hint"><span class="key">TAP</span> Select unit</div>
+    <div class="hint"><span class="key">TAP</span> Tile to move</div>
+    <div class="terrain-key">
+      <span><span class="swatch" style="background:#1a2634;border:1px solid #2a3f55"></span>Normal</span>
+      <span><span class="swatch" style="background:#223344;border:1px solid #2a3f55"></span>High</span>
+      <span><span class="swatch" style="background:#0a1f35;border:1px solid #2a3f55"></span>Water</span>
+      <span><span class="swatch" style="background:#0d1117;border:1px solid #2a3f55"></span>Rock</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+// =============================================================================
+// TACTICAL RPG ENGINE
+// =============================================================================
+
+// --- SECTION: Schemas ---
+const UnitSchema = { id:'', name:'', job:'', hp:0, maxHp:0, mp:0, maxMp:0, speed:0, attack:0, defense:0, moveRange:0, x:0, y:0, team:'player', statusEffects:[], abilities:[] };
+const TileSchema = { x:0, y:0, terrain:'normal', occupied:false, elevation:0 };
+const GameStateSchema = { currentTurn:null, turnQueue:[], units:[], map:[], phase:'battle' };
+
+// --- SECTION: Config ---
+const CONFIG = {
+  GRID_COLS: 8, GRID_ROWS: 8, TILE_SIZE: 64, MIN_TILE_SIZE: 44,
+  COLORS: {
+    TILE_NORMAL:   '#1a2634',
+    TILE_HIGH:     '#1e3045',
+    TILE_OBSTACLE: '#0d1117',
+    TILE_WATER:    '#0a1e35',
+    TILE_BORDER:   '#243650',
+    TILE_HIGHLIGHT:'rgba(80,200,255,0.32)',
+    TILE_SELECTED: 'rgba(255,220,60,0.48)',
+    TILE_HOVER:    'rgba(255,255,255,0.07)',
+    TILE_TARGET:   'rgba(255,80,80,0.38)',
+    TILE_HEAL_TARGET:'rgba(80,255,120,0.38)',
+    TEAM_PLAYER:   '#4fc3f7',
+    TEAM_ENEMY:    '#ef5350',
+    HP_BAR_BG:     '#111828',
+    HP_BAR_FILL:   '#4caf50',
+    MP_BAR_FILL:   '#2196f3',
+    TEXT_LIGHT:    '#e0f0ff',
+    TEXT_DIM:      '#4a6070',
+    PANEL_BG:      'rgba(6,12,22,0.95)',
+    ACCENT:        '#00e5ff',
+    GOLD:          '#ffd740',
+    TURN_INDICATOR:'#ffd740',
+    // New terrain polish colors
+    TILE_HIGH_EDGE:  '#0d1e2e',
+    TILE_HIGH_LIGHT: '#2a4560',
+    WATER_SHIMMER:   'rgba(80,180,255,0.18)',
+    OBSTACLE_CRACK:  'rgba(180,200,220,0.08)',
+    NORMAL_GRAIN:    'rgba(255,255,255,0.022)',
+    // Job accent colors
+    JOB_ACCENT: {
+      'Knight':     '#90caf9',
+      'Mage':       '#ce93d8',
+      'Archer':     '#a5d6a7',
+      'Dark Knight':'#7c4dff',
+      'Healer':     '#f48fb1',
+      'Thief':      '#ffe082',
+      'Paladin':    '#80deea',
+      'Berserker':  '#ff8a65',
+      'Squire':     '#90caf9',
+    },
+  },
+  TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity },
+};
+
+// --- SECTION: Event Bus ---
+const GameEvents = (() => {
+  const _l = {};
+  function on(e,cb){ if(!_l[e])_l[e]=[]; _l[e].push(cb); return ()=>{ _l[e]=_l[e].filter(x=>x!==cb); }; }
+  function off(e,cb){ if(_l[e])_l[e]=_l[e].filter(x=>x!==cb); }
+  function emit(e,d){ console.log(`[GameEvents] ${e}`,d??''); if(!_l[e])return; _l[e].forEach(cb=>{ try{cb(d);}catch(ex){console.error(ex);} }); }
+  function once(e,cb){ const u=on(e,d=>{cb(d);u();}); }
+  return { on, off, emit, once };
+})();
+
+// --- SECTION: Game State ---
+const GameState = {
+  currentTurn: null, turnQueue: [], units: [], map: [], phase: 'battle',
+  selectedUnit: null, validMoveTiles: [], hoveredTile: null, turnNumber: 0,
+  unitMoved: false, unitActed: false,
+  showActionMenu: false, actionMenuUnit: null,
+  pendingAbility: null, validTargetTiles: [],
+  floatingTexts: [], _skipCurrentTurn: false,
+  currentMapId: 'map_1',
+  activeVFX: [],
+  _preMoveSnapshot: null,
+};
+
+// --- SECTION: Unit Factory ---
+function createUnit(o){ return Object.assign({},{id:'',name:'Unknown',job:'Squire',hp:100,maxHp:100,mp:30,maxMp:30,speed:5,attack:12,defense:8,moveRange:3,x:0,y:0,team:'player',statusEffects:[],abilities:['Attack','Wait']},o); }
+
+// --- SECTION: Map Definitions ---
+const MAP_DEFINITIONS = {
+  map_1: {
+    label: 'Ruins of Aethermoor',
+    cols: 8, rows: 8,
+    obstacle: ['3,2','3,3','4,4','6,5','1,1','7,6'],
+    high:     ['2,2','5,3','4,5','7,2'],
+    water:    ['0,4','0,5','1,4'],
+    playerStart: [
+      { id:'p1', x:1, y:5 },
+      { id:'p2', x:2, y:6 },
+      { id:'p3', x:0, y:6 },
+      { id:'p4', x:1, y:6 },
+    ],
+    enemyStart: [
+      { id:'e1', x:5, y:2 },
+      { id:'e2', x:6, y:1 },
+      { id:'e3', x:4, y:1 },
+      { id:'e4', x:7, y:0 },
+    ],
+  },
+  map_2: {
+    label: 'Ashfen Causeway',
+    cols: 8, rows: 8,
+    // Choke point of obstacles through center; wide water on west; high ground at edges
+    obstacle: ['3,3','4,3','3,4','4,4','3,5'],
+    high:     ['0,0','1,0','7,0','6,0','0,7','1,7','7,7','6,7','0,1','7,1'],
+    water:    ['0,2','0,3','0,4','0,5','1,2','1,3','1,4','1,5','2,3','2,4'],
+    playerStart: [
+      { id:'p1', x:2, y:6 },
+      { id:'p2', x:3, y:7 },
+      { id:'p3', x:2, y:5 },
+      { id:'p4', x:3, y:6 },
+    ],
+    enemyStart: [
+      { id:'e1', x:5, y:1 },
+      { id:'e2', x:6, y:2 },
+      { id:'e3', x:5, y:0 },
+      { id:'e4', x:7, y:1 },
+    ],
+  },
+
+  // ── Map 3: Ironhold Passage ─────────────────────────────────
+  // Narrow corridors with chokepoints. Two vertical wall segments (x=2, x=5)
+  // create three lanes: left (x=0–1), center (x=3–4), right (x=6–7).
+  // A horizontal barrier at y=3 forces units to commit to a lane early.
+  // High ground rewards whoever seizes the passage entrances first.
+  map_3: {
+    label: 'Ironhold Passage',
+    cols: 8, rows: 8,
+    // Left divider wall: x=2, rows 1–5
+    // Right divider wall: x=5, rows 1–5
+    // Center horizontal pinch: (3,3) and (4,3)
+    obstacle: [
+      '2,1','2,2','2,3','2,4','2,5',
+      '5,1','5,2','5,3','5,4','5,5',
+      '3,3','4,3',
+    ],
+    // High ground at lane entrances — center-left and center-right passage mouths
+    high: [
+      '1,3','1,4',   // left lane entrance (mid)
+      '6,3','6,4',   // right lane entrance (mid)
+      '3,2','4,2',   // top of center lane
+      '3,4','4,4',   // bottom of center lane (below pinch)
+    ],
+    // Minimal water — two tiles at far edge corners only
+    water: ['0,0','7,0'],
+    // Players start bottom-center, funneled into the three lanes
+    playerStart: [
+      { id:'p1', x:3, y:6 },
+      { id:'p2', x:4, y:6 },
+      { id:'p3', x:3, y:7 },
+      { id:'p4', x:4, y:7 },
+    ],
+    // Enemies start top-center, mirroring player approach
+    // (3,1) and (4,1) are clear — wall at x=2,x=5 starts at y=1 but x=3,4 are open
+    enemyStart: [
+      { id:'e1', x:3, y:1 },
+      { id:'e2', x:4, y:1 },
+      { id:'e3', x:3, y:0 },
+      { id:'e4', x:4, y:0 },
+    ],
+  },
+
+  // ── Map 4: Thornmire Shallows ───────────────────────────────
+  // Heavy water (27 tiles, ~42%) forces island-hopping via a narrow central land
+  // bridge. Ranged and mobile units shine; melee must navigate carefully.
+  // Land: SW island (players), NE island (enemies), central bridge, NW/SE corners.
+  // Water covers all else — verified no unit start is on water.
+  map_4: {
+    label: 'Thornmire Shallows',
+    cols: 8, rows: 8,
+    obstacle: [],
+    // High ground on island edges and the central bridge for strategic value
+    high: [
+      '5,0','5,1','5,2',  // NE island western ridge
+      '0,5','1,5',        // SW island northern edge
+      '4,2','3,4',        // bridge stepping stones
+    ],
+    // 27 water tiles — every tile NOT part of an island or bridge
+    // Land tiles: NW corner (0-1,0-2), NE island (5-7,0-2),
+    //             bridge (3-4,3-4 + 2,4 + 4,2 + 5,3-4),
+    //             SW island (0-2,5-7), SE corner (6-7,5-7)
+    water: [
+      '2,0','3,0','4,0',
+      '2,1','3,1','4,1',
+      '2,2','3,2',
+      '1,3','2,3','6,3','7,3',
+      '0,4','1,4','6,4','7,4',
+      '3,5','4,5','5,5',
+      '3,6','4,6','5,6',
+      '3,7','4,7','5,7',
+    ],
+    // Players on SW island (x=0–2, y=5–7)
+    playerStart: [
+      { id:'p1', x:0, y:6 },
+      { id:'p2', x:1, y:6 },
+      { id:'p3', x:0, y:7 },
+      { id:'p4', x:1, y:7 },
+    ],
+    // Enemies on NE island (x=5–7, y=0–2)
+    // Note: (5,0) is high ground — valid start position
+    enemyStart: [
+      { id:'e1', x:6, y:1 },
+      { id:'e2', x:7, y:1 },
+      { id:'e3', x:6, y:0 },
+      { id:'e4', x:7, y:0 },
+    ],
+  },
+
+  // ── Map 5: Verdant Escarpment ───────────────────────────────
+  // Asymmetric terrain — enemies command 21 high-ground tiles across rows 0–2.
+  // Players stage on flat ground (rows 5–7) and must push uphill through a
+  // transition zone of obstacles and scattered high tiles (rows 3–4).
+  // This map is intentionally hard for the player.
+  map_5: {
+    label: 'Verdant Escarpment',
+    cols: 8, rows: 8,
+    // Obstacles: flanking walls in rows 0–2 and a dense transition barrier in rows 3–4
+    obstacle: [
+      '7,1','0,2','7,2',          // high plateau walls
+      '2,3','3,3','5,3','6,3',    // upper transition barrier
+      '1,4','4,4','6,4',          // lower transition barrier
+    ],
+    // High ground: entire plateau (rows 0–2 minus obstacles) plus scattered outcrops
+    high: [
+      // Row 0 — full ridge
+      '0,0','1,0','2,0','3,0','4,0','5,0','6,0','7,0',
+      // Row 1 — plateau (obstacle at 7,1)
+      '0,1','1,1','2,1','3,1','4,1','5,1','6,1',
+      // Row 2 — fortified edge (obstacles at 0,2 and 7,2)
+      '1,2','2,2','3,2','4,2','5,2','6,2',
+      // Scattered outcrops in transition zone
+      '0,3','4,3','7,3',
+      '3,4','7,4',
+    ],
+    water: [],
+    // Players stage on flat bottom rows — well clear of obstacles
+    playerStart: [
+      { id:'p1', x:3, y:6 },
+      { id:'p2', x:4, y:6 },
+      { id:'p3', x:3, y:7 },
+      { id:'p4', x:4, y:7 },
+    ],
+    // Enemies hold the high plateau — all start on high-ground tiles
+    enemyStart: [
+      { id:'e1', x:3, y:0 },
+      { id:'e2', x:5, y:0 },
+      { id:'e3', x:2, y:1 },
+      { id:'e4', x:4, y:1 },
+    ],
+  },
+
+  // ── Map 6: The Shattered Keep ──────────────────────────────
+  // Climactic fortress interior: ruined outer walls with three breach points,
+  // a high-ground central courtyard, and two water pools flanking the mid-zone.
+  // Enemies hold the fortified interior; players breach from the south.
+  map_6: {
+    label: 'The Shattered Keep',
+    cols: 8, rows: 8,
+    // Ruined outer ring — top corners + side stubs + inner fortification pillars
+    // Three natural breach gaps: far-left col (x=0,y=0 open), center (x=3-4,y=0),
+    // and far-right (x=7,y=0 open) — enemies occupy center-top gap tiles
+    obstacle: [
+      '1,0','6,0',              // ruined top parapet (gaps at 0,3-4,7)
+      '0,1','0,2','7,1','7,2',  // outer side walls (top half)
+      '2,2','5,2',              // inner fortification pillars
+      '1,3','6,3',              // mid-zone corridor pinch
+      '2,4','5,4',              // mid-zone second pinch
+      '0,5','7,5',              // lower side obstacles
+    ],
+    // Central courtyard high ground — controls the fight
+    high: [
+      '3,2','4,2',
+      '3,3','4,3',
+      '3,4','4,4',
+      '2,1','5,1',  // flanking high for defenders
+    ],
+    // Two water pools flanking the mid-zone (SW and SE pockets)
+    water: [
+      '1,4','1,5','2,5',  // SW pool (3 tiles)
+      '5,5','6,5','6,4',  // SE pool (3 tiles)
+    ],
+    // Players breach from the south — positions clear of obstacles and water
+    playerStart: [
+      { id:'p1', x:3, y:6 },
+      { id:'p2', x:4, y:6 },
+      { id:'p3', x:3, y:7 },
+      { id:'p4', x:4, y:7 },
+    ],
+    // Enemies hold the fortified center-top
+    // (2,0),(3,0),(4,0),(5,0) are open (obstacles at 1,0 and 6,0 only)
+    enemyStart: [
+      { id:'e1', x:3, y:0 },
+      { id:'e2', x:4, y:0 },
+      { id:'e3', x:2, y:0 },
+      { id:'e4', x:5, y:0 },
+    ],
+  },
+};
+
+// Base unit templates — positions overridden per map
+const BASE_UNITS = [
+  createUnit({ id:'p1', name:'Aldric',    job:'Knight',     hp:140,maxHp:140, mp:20, maxMp:20,  speed:3, attack:16, defense:16, moveRange:3, x:1,y:5, team:'player', abilities:['Attack','Shield Bash','Wait'] }),
+  createUnit({ id:'p2', name:'Lyra',      job:'Mage',       hp:65, maxHp:65,  mp:90, maxMp:90,  speed:8, attack:24, defense:5,  moveRange:4, x:2,y:6, team:'player', abilities:['Attack','Fireball','Heal','Wait'] }),
+  createUnit({ id:'p3', name:'Kael',      job:'Paladin',    hp:120,maxHp:120, mp:60, maxMp:60,  speed:4, attack:14, defense:18, moveRange:3, x:0,y:6, team:'player', abilities:['Attack','Holy Lance','Barrier','Wait'] }),
+  createUnit({ id:'p4', name:'Zara',      job:'Thief',      hp:80, maxHp:80,  mp:40, maxMp:40,  speed:9, attack:14, defense:6,  moveRange:5, x:1,y:6, team:'player', abilities:['Attack','Steal Mana','Smoke Bomb','Wait'] }),
+  createUnit({ id:'e1', name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:5,y:2, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
+  createUnit({ id:'e2', name:'Darkwraith',job:'Dark Knight',hp:115,maxHp:115, mp:50, maxMp:50,  speed:4, attack:22, defense:12, moveRange:2, x:6,y:1, team:'enemy',  abilities:['Attack','Dark Wave','Wait'] }),
+  createUnit({ id:'e3', name:'Brute',     job:'Berserker',  hp:130,maxHp:130, mp:0,  maxMp:0,   speed:5, attack:28, defense:7,  moveRange:3, x:4,y:1, team:'enemy',  abilities:['Attack','Rampage','Wait'] }),
+  createUnit({ id:'e4', name:'Sister',    job:'Healer',     hp:75, maxHp:75,  mp:100,maxMp:100, speed:7, attack:8,  defense:8,  moveRange:4, x:7,y:0, team:'enemy',  abilities:['Attack','Mend','Revive','Wait'] }),
+];
+
+// --- SECTION: Map System ---
+const MapSystem = (() => {
+  function buildMap(def) {
+    const obs = new Set(def.obstacle || []);
+    const hi  = new Set(def.high     || []);
+    const wat = new Set(def.water    || []);
+    const map = [];
+    for(let r=0;r<def.rows;r++){
+      map[r]=[];
+      for(let c=0;c<def.cols;c++){
+        const k=`${c},${r}`;
+        let terrain='normal', elevation=0;
+        if(obs.has(k)){ terrain='obstacle'; elevation=2; }
+        else if(hi.has(k)){ terrain='high'; elevation=1; }
+        else if(wat.has(k)){ terrain='water'; elevation=-1; }
+        map[r][c]=Object.assign({},TileSchema,{x:c,y:r,terrain,elevation,occupied:false});
+      }
+    }
+    return map;
+  }
+
+  function load(mapId) {
+    const def = MAP_DEFINITIONS[mapId];
+    if (!def) { console.error('[MapSystem] Unknown map:', mapId); return; }
+    GameState.currentMapId = mapId;
+
+    // Build fresh map
+    GameState.map = buildMap(def);
+
+    // Reset units with map-specific starting positions (preserve HP/MP/etc freshly)
+    const allStarts = [...(def.playerStart||[]), ...(def.enemyStart||[])];
+    GameState.units = BASE_UNITS.map(template => {
+      const override = allStarts.find(s => s.id === template.id);
+      const u = Object.assign({}, template, { statusEffects:[], hp:template.maxHp, mp:template.maxMp });
+      if (override) { u.x = override.x; u.y = override.y; }
+      return u;
+    });
+
+    syncMapOccupancy();
+    console.log(`%c[MapSystem] Loaded "${def.label}"`, 'color:#00e5ff;font-weight:bold');
+    return def;
+  }
+
+  function cycleMap() {
+    const ids = Object.keys(MAP_DEFINITIONS);
+    const cur = ids.indexOf(GameState.currentMapId);
+    const next = ids[(cur + 1) % ids.length];
+    // Full restart on map change
+    GameState.phase = 'battle';
+    document.getElementById('end-overlay').style.display = 'none';
+    load(next);
+
+    // Reset turn system
+    GameState.currentTurn = null;
+    GameState.turnQueue = [];
+    GameState.selectedUnit = null;
+    GameState.validMoveTiles = [];
+    GameState.unitMoved = false;
+    GameState.unitActed = false;
+    GameState.showActionMenu = false;
+    GameState.actionMenuUnit = null;
+    GameState.pendingAbility = null;
+    GameState.validTargetTiles = [];
+    GameState.floatingTexts = [];
+    GameState.activeVFX = [];
+    GameState.turnNumber = 0;
+
+    TurnSystem.start();
+    Renderer.draw();
+
+    // Update map button label
+    const btn = document.getElementById('map-select-btn');
+    if (btn) btn.textContent = `${MAP_DEFINITIONS[next].label.split(' ')[0].toUpperCase()} ▸`;
+  }
+
+  return { load, buildMap, cycleMap };
+})();
+
+// Legacy shim — generate initial map from map_1 definition
+function generateMap(cols,rows){ return MapSystem.buildMap(MAP_DEFINITIONS.map_1); }
+
+// --- SECTION: Turn System ---
+const TurnSystem = (() => {
+  function buildQueue(units){ return [...units].filter(u=>u.hp>0).sort((a,b)=>b.speed-a.speed||a.id.localeCompare(b.id)).map(u=>u.id); }
+  function start(){ GameState.turnNumber=0; GameState.turnQueue=buildQueue(GameState.units); advanceTurn(); }
+  function advanceTurn(){
+    GameState.turnQueue=GameState.turnQueue.filter(id=>{ const u=getUnit(id); return u&&u.hp>0; });
+    if(GameState.turnQueue.length===0){ GameState.turnQueue=buildQueue(GameState.units); GameState.turnNumber++; }
+    if(checkBattleEnd())return;
+    const nextId=GameState.turnQueue.shift();
+    GameState.currentTurn=nextId;
+    GameState.unitMoved=false; GameState.unitActed=false;
+    GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+    GameState.pendingAbility=null; GameState.validTargetTiles=[];
+    GameState.selectedUnit=null; GameState.validMoveTiles=[];
+    GameState._skipCurrentTurn=false;
+    const unit=getUnit(nextId);
+    if(unit){ StatusSystem.tick(unit); }
+    if(checkBattleEnd())return;
+    const fresh=getUnit(nextId);
+    if(!fresh||fresh.hp<=0){ advanceTurn(); return; }
+    GameEvents.emit('turn:start',{unit:fresh,turnNumber:GameState.turnNumber});
+  }
+  function endTurn(){
+    const unit=getUnit(GameState.currentTurn);
+    GameEvents.emit('turn:end',{unit});
+    GameState.selectedUnit=null; GameState.validMoveTiles=[];
+    GameState.unitMoved=false; GameState.unitActed=false;
+    GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+    GameState.pendingAbility=null; GameState.validTargetTiles=[];
+    GameState._preMoveSnapshot=null;
+    const undoBtn = document.getElementById('undo-move-btn');
+    if(undoBtn) undoBtn.style.display='none';
+    advanceTurn(); Renderer.draw();
+  }
+  function checkBattleEnd(){
+    const pl=GameState.units.filter(u=>u.team==='player'&&u.hp>0);
+    const en=GameState.units.filter(u=>u.team==='enemy'&&u.hp>0);
+    if(pl.length===0){ GameState.phase='menu'; GameEvents.emit('battle:loss',{message:'All player units defeated.'}); return true; }
+    if(en.length===0){ GameState.phase='menu'; GameEvents.emit('battle:win',{message:'All enemies defeated!'}); return true; }
+    return false;
+  }
+  return { start, advanceTurn, endTurn, buildQueue, checkBattleEnd };
+})();
+
+// --- SECTION: Movement System ---
+const MovementSystem = (() => {
+  function getReachableTiles(unit){
+    const {x,y,moveRange}=unit;
+    const visited=new Map(); const queue=[{x,y,cost:0}]; const reachable=[];
+    visited.set(`${x},${y}`,0);
+    while(queue.length>0){
+      queue.sort((a,b)=>a.cost-b.cost);
+      const {x:cx,y:cy,cost}=queue.shift();
+      if(cost>moveRange)continue;
+      // Only add to reachable if this tile is landable (not occupied by another unit)
+      if(!(cx===x&&cy===y)){
+        const occHere=getUnitAt(cx,cy);
+        if(!occHere||occHere.id===unit.id) reachable.push({x:cx,y:cy});
+      }
+      for(const [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){
+        const nx=cx+dx,ny=cy+dy;
+        if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS)continue;
+        const tile=GameState.map[ny][nx];
+        const mc=CONFIG.TERRAIN_MOVE_COST[tile.terrain]??Infinity;
+        if(mc===Infinity)continue;
+        const occ=getUnitAt(nx,ny);
+        // Enemies fully block traversal — can't pass through or land on them
+        if(occ&&occ.id!==unit.id&&occ.team!==unit.team)continue;
+        // Allies can be passed through for pathfinding cost purposes
+        const nc=cost+mc; const k=`${nx},${ny}`;
+        if(!visited.has(k)||visited.get(k)>nc){ visited.set(k,nc); if(nc<=moveRange)queue.push({x:nx,y:ny,cost:nc}); }
+      }
+    }
+    return reachable;
+  }
+  function selectUnit(unitId){
+    const unit=getUnit(unitId); if(!unit)return;
+    if(unit.id!==GameState.currentTurn||unit.team!=='player'){
+      GameState.selectedUnit=unitId; GameState.validMoveTiles=[];
+      GameEvents.emit('unit:selected',{unit,canAct:false}); Renderer.draw(); return;
+    }
+    GameState.selectedUnit=unitId;
+    if(!GameState.unitMoved){ GameState.validMoveTiles=getReachableTiles(unit); }
+    else { GameState.validMoveTiles=[]; }
+    if(GameState.unitMoved&&!GameState.unitActed){ GameState.showActionMenu=true; GameState.actionMenuUnit=unitId; }
+    GameEvents.emit('unit:selected',{unit,canAct:true,moveTiles:GameState.validMoveTiles}); Renderer.draw();
+  }
+  function moveUnit(unitId,toX,toY){
+    const unit=getUnit(unitId); if(!unit)return false;
+    const isValid=GameState.validMoveTiles.some(t=>t.x===toX&&t.y===toY); if(!isValid)return false;
+    const occ=getUnitAt(toX,toY); if(occ&&occ.id!==unitId)return false;
+    // Snapshot pre-move state for undo
+    GameState._preMoveSnapshot={ unitId, fromX:unit.x, fromY:unit.y };
+    GameState.map[unit.y][unit.x].occupied=false;
+    unit.x=toX; unit.y=toY;
+    GameState.map[toY][toX].occupied=true;
+    GameState.validMoveTiles=[]; GameState.unitMoved=true;
+    GameEvents.emit('unit:moved',{unit,toX,toY});
+    GameState.showActionMenu=true; GameState.actionMenuUnit=unitId; GameState.selectedUnit=unitId;
+    // Show undo button — only valid until an action is taken
+    const undoBtn = document.getElementById('undo-move-btn');
+    if(undoBtn) undoBtn.style.display='inline-block';
+    Renderer.draw(); return true;
+  }
+  function undoMove(){
+    const snap = GameState._preMoveSnapshot;
+    if(!snap || GameState.unitActed) return false;
+    const unit = getUnit(snap.unitId); if(!unit) return false;
+    // Restore position
+    GameState.map[unit.y][unit.x].occupied = false;
+    unit.x = snap.fromX; unit.y = snap.fromY;
+    GameState.map[snap.fromY][snap.fromX].occupied = true;
+    // Reset move state
+    GameState.unitMoved = false;
+    GameState._preMoveSnapshot = null;
+    GameState.showActionMenu = false;
+    GameState.actionMenuUnit = null;
+    // Restore move highlights
+    GameState.validMoveTiles = getReachableTiles(unit);
+    GameState.selectedUnit = unit.id;
+    const undoBtn = document.getElementById('undo-move-btn');
+    if(undoBtn) undoBtn.style.display='none';
+    Renderer.draw();
+    return true;
+  }
+  return { getReachableTiles, selectUnit, moveUnit, undoMove };
+})();
+
+// --- SECTION: Input Manager ---
+const InputManager = (() => {
+  let _canvas=null, _ts=CONFIG.TILE_SIZE;
+  let _mouseCanvasX = -1, _mouseCanvasY = -1;
+  function setCanvas(c,ts){ _canvas=c; _ts=ts; }
+  function getMousePos(){ return { x: _mouseCanvasX, y: _mouseCanvasY }; }
+  function screenToGrid(cx,cy){
+    const r=_canvas.getBoundingClientRect();
+    const sx=_canvas.width/r.width, sy=_canvas.height/r.height;
+    const col=Math.floor((cx-r.left)*sx/_ts), row=Math.floor((cy-r.top)*sy/_ts);
+    if(col<0||row<0||col>=CONFIG.GRID_COLS||row>=CONFIG.GRID_ROWS)return null;
+    return {x:col,y:row};
+  }
+  function screenToCanvas(cx,cy){
+    const r=_canvas.getBoundingClientRect();
+    const sx=_canvas.width/r.width, sy=_canvas.height/r.height;
+    return {x:(cx-r.left)*sx, y:(cy-r.top)*sy};
+  }
+  function handleInteraction(gridX,gridY,cvX,cvY){
+    if(GameState.phase!=='battle')return;
+    if(GameState.showActionMenu&&GameState.actionMenuUnit){
+      const hit=ActionMenu.hitTest(cvX,cvY);
+      if(hit!==null){ ActionMenu.handleSelection(hit); return; }
+      GameState.showActionMenu=false; GameState.actionMenuUnit=null; GameState.selectedUnit=null; Renderer.draw(); return;
+    }
+    if(GameState.pendingAbility){
+      const isTarget=GameState.validTargetTiles.some(t=>t.x===gridX&&t.y===gridY);
+      if(isTarget){
+        const unit=getUnit(GameState.currentTurn);
+        AbilitySystem.execute(unit,GameState.pendingAbility,gridX,gridY);
+      } else {
+        GameState.pendingAbility=null; GameState.validTargetTiles=[];
+        if(!GameState.unitActed){ GameState.showActionMenu=true; GameState.actionMenuUnit=GameState.currentTurn; }
+        Renderer.draw();
+      }
+      return;
+    }
+    // For Revive: fallen units are invisible (hp===0 filtered by getUnitAt),
+    // so check validTargetTiles directly before falling through to normal unit selection
+    if(GameState.pendingAbility==='Revive'){
+      const isTarget=GameState.validTargetTiles.some(t=>t.x===gridX&&t.y===gridY);
+      if(isTarget){ const unit=getUnit(GameState.currentTurn); AbilitySystem.execute(unit,'Revive',gridX,gridY); return; }
+    }
+    const cu=getUnitAt(gridX,gridY);
+    if(GameState.selectedUnit){
+      const su=getUnit(GameState.selectedUnit);
+      if(cu&&cu.id===GameState.selectedUnit){
+        if(su.id===GameState.currentTurn&&su.team==='player'&&!GameState.unitActed){
+          GameState.showActionMenu=true; GameState.actionMenuUnit=su.id; Renderer.draw(); return;
+        }
+        GameState.selectedUnit=null; GameState.validMoveTiles=[]; Renderer.draw(); return;
+      }
+      const isVM=GameState.validMoveTiles.some(t=>t.x===gridX&&t.y===gridY);
+      if(isVM&&su&&su.id===GameState.currentTurn){ MovementSystem.moveUnit(GameState.selectedUnit,gridX,gridY); return; }
+      if(cu){ MovementSystem.selectUnit(cu.id); return; }
+      GameState.selectedUnit=null; GameState.validMoveTiles=[]; Renderer.draw(); return;
+    }
+    if(cu)MovementSystem.selectUnit(cu.id);
+  }
+  function handleClick(e){
+    e.preventDefault(); if(!_canvas)return;
+    const cv=screenToCanvas(e.clientX,e.clientY);
+    const grid=screenToGrid(e.clientX,e.clientY);
+    if(!grid){
+      if(GameState.showActionMenu){ const h=ActionMenu.hitTest(cv.x,cv.y); if(h!==null){ActionMenu.handleSelection(h);return;} GameState.showActionMenu=false;GameState.actionMenuUnit=null;Renderer.draw(); }
+      return;
+    }
+    handleInteraction(grid.x,grid.y,cv.x,cv.y);
+  }
+  function handleTouch(e){
+    e.preventDefault(); if(!_canvas)return;
+    const t=e.changedTouches[0]; if(!t)return;
+    const cv=screenToCanvas(t.clientX,t.clientY);
+    const grid=screenToGrid(t.clientX,t.clientY);
+    if(!grid){
+      if(GameState.showActionMenu){ const h=ActionMenu.hitTest(cv.x,cv.y); if(h!==null){ActionMenu.handleSelection(h);return;} GameState.showActionMenu=false;GameState.actionMenuUnit=null;Renderer.draw(); }
+      return;
+    }
+    handleInteraction(grid.x,grid.y,cv.x,cv.y);
+  }
+  function handleMouseMove(e){
+    if(!_canvas)return;
+    const cv=screenToCanvas(e.clientX,e.clientY);
+    _mouseCanvasX=cv.x; _mouseCanvasY=cv.y;
+    const g=screenToGrid(e.clientX,e.clientY);
+    if(!g){GameState.hoveredTile=null;Renderer.draw();return;}
+    if(!GameState.hoveredTile||GameState.hoveredTile.x!==g.x||GameState.hoveredTile.y!==g.y){GameState.hoveredTile=g;Renderer.draw();}
+  }
+  function attach(canvas,ts){
+    setCanvas(canvas,ts);
+    if(canvas._inputAttached) return;
+    canvas._inputAttached = true;
+    canvas.addEventListener('click',handleClick,{passive:false});
+    canvas.addEventListener('touchend',handleTouch,{passive:false});
+    canvas.addEventListener('mousemove',handleMouseMove,{passive:true});
+    canvas.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+  }
+  return { attach, screenToGrid, setCanvas, getMousePos };
+})();
+
+// --- SECTION: Terrain Visuals ---
+// Water shimmer animation state
+const WaterAnim = {
+  phase: 0,
+  rafId: null,
+  active: false,
+  start() {
+    if (this.active) return;
+    this.active = true;
+    const tick = () => {
+      this.phase = (this.phase + 0.04) % (Math.PI * 2);
+      Renderer.draw();
+      this.rafId = requestAnimationFrame(tick);
+    };
+    this.rafId = requestAnimationFrame(tick);
+  },
+  stop() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.active = false;
+    this.rafId = null;
+  },
+  check() {
+    const hasWater = GameState.map.some(row => row.some(t => t.terrain === 'water'));
+    if (hasWater && !this.active) this.start();
+    else if (!hasWater && this.active) this.stop();
+  },
+};
+
+// Pre-baked grain pattern for normal tiles (seeded deterministic noise)
+function makeGrainPattern(ctx, ts) {
+  const offscreen = document.createElement('canvas');
+  offscreen.width = ts; offscreen.height = ts;
+  const octx = offscreen.getContext('2d');
+  // subtle dot noise
+  octx.fillStyle = CONFIG.COLORS.TILE_NORMAL;
+  octx.fillRect(0, 0, ts, ts);
+  const seed = [17, 53, 97, 131, 179, 211, 251];
+  for (let i = 0; i < 22; i++) {
+    const x = (seed[i % 7] * (i + 3) * 7) % ts;
+    const y = (seed[(i + 2) % 7] * (i + 5) * 11) % ts;
+    octx.fillStyle = CONFIG.COLORS.NORMAL_GRAIN;
+    octx.fillRect(x, y, 2, 2);
+  }
+  return ctx.createPattern(offscreen, 'repeat');
+}
+
+// Cache patterns per tile size
+let _grainPattern = null;
+let _grainTs = 0;
+
+function drawTerrainNormal(ctx, tile, px, py, ts) {
+  if (_grainTs !== ts || !_grainPattern) {
+    _grainPattern = makeGrainPattern(ctx, ts);
+    _grainTs = ts;
+  }
+  ctx.fillStyle = CONFIG.COLORS.TILE_NORMAL;
+  ctx.fillRect(px, py, ts, ts);
+  if (_grainPattern) {
+    ctx.fillStyle = _grainPattern;
+    ctx.fillRect(px, py, ts, ts);
+  }
+}
+
+function drawTerrainHigh(ctx, tile, px, py, ts) {
+  // Base fill (lighter than normal)
+  ctx.fillStyle = CONFIG.COLORS.TILE_HIGH;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Top face — subtle highlight along top and left
+  ctx.strokeStyle = CONFIG.COLORS.TILE_HIGH_LIGHT;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px, py + ts - 1);
+  ctx.lineTo(px, py);
+  ctx.lineTo(px + ts - 1, py);
+  ctx.stroke();
+
+  // Bottom / right — dark edge implying elevation
+  const edgeH = Math.max(3, Math.floor(ts * 0.08));
+  ctx.fillStyle = CONFIG.COLORS.TILE_HIGH_EDGE;
+  ctx.fillRect(px, py + ts - edgeH, ts, edgeH);
+
+  // Right edge
+  const edgeW = Math.max(3, Math.floor(ts * 0.06));
+  ctx.fillStyle = CONFIG.COLORS.TILE_HIGH_EDGE;
+  ctx.fillRect(px + ts - edgeW, py, edgeW, ts);
+
+  // Crosshatch hatching lines for texture
+  ctx.save();
+  ctx.rect(px, py, ts, ts - edgeH);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(100,170,220,0.07)';
+  ctx.lineWidth = 0.8;
+  for (let i = -ts; i < ts * 2; i += 9) {
+    ctx.beginPath();
+    ctx.moveTo(px + i, py);
+    ctx.lineTo(px + i + ts, py + ts);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTerrainWater(ctx, tile, px, py, ts) {
+  const phase = WaterAnim.phase;
+
+  // Deep base
+  ctx.fillStyle = CONFIG.COLORS.TILE_WATER;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Animated shimmer layer
+  const alpha1 = 0.12 + 0.06 * Math.sin(phase + tile.x * 0.9);
+  ctx.fillStyle = `rgba(60,160,255,${alpha1.toFixed(3)})`;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Wave lines
+  ctx.save();
+  ctx.rect(px, py, ts, ts);
+  ctx.clip();
+  for (let wi = 0; wi < 3; wi++) {
+    const wPhase = phase + wi * 1.1 + tile.x * 0.5 + tile.y * 0.3;
+    const wy = py + ts * (0.28 + wi * 0.22) + Math.sin(wPhase) * (ts * 0.04);
+    const alpha = 0.15 + 0.08 * Math.sin(phase * 0.7 + wi);
+    ctx.strokeStyle = `rgba(120,210,255,${alpha.toFixed(3)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, wy);
+    ctx.bezierCurveTo(
+      px + ts * 0.3, wy - ts * 0.04 * Math.sin(wPhase * 1.3),
+      px + ts * 0.7, wy + ts * 0.04 * Math.sin(wPhase * 0.9),
+      px + ts, wy
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Glint sparkle
+  const glintA = Math.max(0, 0.5 * Math.sin(phase * 2.1 + tile.x * 1.3 + tile.y * 0.7));
+  if (glintA > 0.1) {
+    const gx = px + ts * 0.55, gy = py + ts * 0.3;
+    ctx.fillStyle = `rgba(200,240,255,${(glintA * 0.7).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(gx, gy, ts * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawTerrainObstacle(ctx, tile, px, py, ts) {
+  // Dark base
+  ctx.fillStyle = CONFIG.COLORS.TILE_OBSTACLE;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Rock cluster shapes
+  ctx.save();
+  ctx.rect(px, py, ts, ts);
+  ctx.clip();
+
+  const rockPositions = [
+    { rx: 0.22, ry: 0.4,  rw: 0.28, rh: 0.3,  r: 4 },
+    { rx: 0.48, ry: 0.28, rw: 0.22, rh: 0.28,  r: 3 },
+    { rx: 0.55, ry: 0.52, rw: 0.26, rh: 0.24,  r: 3 },
+    { rx: 0.2,  ry: 0.65, rw: 0.18, rh: 0.2,   r: 3 },
+  ];
+
+  rockPositions.forEach(({ rx, ry, rw, rh, r }) => {
+    const x = px + rx * ts, y = py + ry * ts;
+    const w = rw * ts, h = rh * ts;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+
+    // Rock gradient
+    const rg = ctx.createLinearGradient(x, y, x + w, y + h);
+    rg.addColorStop(0, 'rgba(60,75,90,0.9)');
+    rg.addColorStop(1, 'rgba(20,28,36,0.9)');
+    ctx.fillStyle = rg;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(80,100,120,0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  });
+
+  // Crack lines
+  const cracks = [
+    [0.35, 0.35, 0.45, 0.6],
+    [0.5,  0.3,  0.65, 0.55],
+    [0.25, 0.5,  0.38, 0.68],
+  ];
+  ctx.strokeStyle = CONFIG.COLORS.OBSTACLE_CRACK;
+  ctx.lineWidth = 0.7;
+  for (const [x1, y1, x2, y2] of cracks) {
+    const mx = (x1 + x2) / 2 + (Math.random() * 0.06 - 0.03);
+    const my = (y1 + y2) / 2 + (Math.random() * 0.06 - 0.03);
+    ctx.beginPath();
+    ctx.moveTo(px + x1 * ts, py + y1 * ts);
+    ctx.quadraticCurveTo(px + mx * ts, py + my * ts, px + x2 * ts, py + y2 * ts);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- SECTION: VFX System ---
+const VFXSystem = (() => {
+  // Each VFX entry: { type, startTime, duration, ...params }
+  function _spawn(vfx){ GameState.activeVFX.push(vfx); }
+
+  function spawnForAbility(unit, abilityId, targetX, targetY){
+    const ts = Renderer.getTileSize();
+    const now = Date.now();
+    const cx = (targetX + 0.5) * ts, cy = (targetY + 0.5) * ts;
+    const ux = (unit.x + 0.5) * ts, uy = (unit.y + 0.5) * ts;
+
+    switch(abilityId){
+      case 'Attack':
+        _spawn({ type:'flash', startTime:now, duration:200, cx, cy, color:'rgba(255,255,255,', ts });
+        break;
+      case 'Shield Bash':
+      case 'Rampage':
+        _spawn({ type:'impact_burst', startTime:now, duration:250, cx, cy, ts, color:'255,160,60' });
+        break;
+      case 'Fireball':
+        _spawn({ type:'fireball', startTime:now, duration:400, cx, cy, ts });
+        break;
+      case 'Heal':
+      case 'Mend':
+      case 'Revive':
+        _spawn({ type:'heal_particles', startTime:now, duration:500, cx, cy, ts });
+        break;
+      case 'Dark Wave':
+        _spawn({ type:'dark_wave', startTime:now, duration:400, ux, uy, cx, cy, ts });
+        break;
+      case 'Arrow Shot':
+        _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'150,230,120', ts });
+        break;
+      case 'Holy Lance':
+        _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'255,245,180', ts });
+        break;
+      case 'Barrier':
+        _spawn({ type:'barrier_ring', startTime:now, duration:400, cx, cy, ts });
+        break;
+      case 'Smoke Bomb':
+        _spawn({ type:'smoke', startTime:now, duration:500,
+          cx: (unit.x + 0.5) * ts, cy: (unit.y + 0.5) * ts, ts });
+        break;
+      case 'Steal Mana':
+        _spawn({ type:'steal_mana', startTime:now, duration:400, ux, uy, cx, cy, ts });
+        break;
+    }
+  }
+
+  function drawAll(ctx){
+    const now = Date.now();
+    GameState.activeVFX = GameState.activeVFX.filter(v => (now - v.startTime) < v.duration);
+    for(const v of GameState.activeVFX){
+      const t = Math.min(1, (now - v.startTime) / v.duration); // 0→1
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      try { _drawVFX(ctx, v, t); } catch(e){}
+      ctx.restore();
+    }
+    if(GameState.activeVFX.length > 0 && GameState.phase === 'battle'){
+      requestAnimationFrame(() => Renderer.draw());
+    }
+  }
+
+  function _drawVFX(ctx, v, t){
+    switch(v.type){
+
+      case 'flash': {
+        // White flash fading out over 200ms
+        const alpha = (1 - t) * 0.65;
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        const r = v.ts * 0.52;
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r, 0, Math.PI*2); ctx.fill();
+        break;
+      }
+
+      case 'fireball': {
+        // Expanding ring: radius 0→1.5 tiles, fades after 60%
+        const maxR = v.ts * 1.5;
+        const r = t * maxR;
+        const fadeT = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+        // Outer fire ring
+        const grd = ctx.createRadialGradient(v.cx, v.cy, r*0.3, v.cx, v.cy, r);
+        grd.addColorStop(0, `rgba(255,200,60,${(0.8*fadeT).toFixed(3)})`);
+        grd.addColorStop(0.5, `rgba(255,100,20,${(0.6*fadeT).toFixed(3)})`);
+        grd.addColorStop(1, `rgba(180,30,0,0)`);
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r, 0, Math.PI*2);
+        ctx.fillStyle = grd; ctx.fill();
+        // Bright core flash at start
+        if(t < 0.25){
+          const coreAlpha = (1 - t/0.25) * 0.7;
+          ctx.beginPath(); ctx.arc(v.cx, v.cy, r*0.4, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(255,240,180,${coreAlpha.toFixed(3)})`; ctx.fill();
+        }
+        break;
+      }
+
+      case 'heal_particles': {
+        // 4 small cross shapes rising upward, staggered
+        const crosses = 4;
+        for(let i=0; i<crosses; i++){
+          const phase = (t + i/crosses) % 1;
+          const alpha = phase < 0.8 ? 1 : 1 - (phase-0.8)/0.2;
+          const spread = v.ts * 0.32;
+          const ox = Math.cos(i * Math.PI*2/crosses) * spread * 0.7;
+          const rise = phase * v.ts * 0.85;
+          const px = v.cx + ox, py = v.cy - rise;
+          const arm = Math.max(3, v.ts * 0.09);
+          ctx.strokeStyle = `rgba(80,255,140,${alpha.toFixed(3)})`;
+          ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+          ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(px-arm, py); ctx.lineTo(px+arm, py); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(px, py-arm); ctx.lineTo(px, py+arm); ctx.stroke();
+        }
+        break;
+      }
+
+      case 'dark_wave': {
+        // Sweeping purple horizontal line from caster toward target
+        const alpha = t < 0.75 ? 1 : 1-(t-0.75)/0.25;
+        const px = v.ux + (v.cx - v.ux) * t;
+        const py = v.uy + (v.cy - v.uy) * t;
+        const len = v.ts * 0.6;
+        const ang = Math.atan2(v.cy - v.uy, v.cx - v.ux);
+        const perpX = Math.sin(ang) * len, perpY = -Math.cos(ang) * len;
+        ctx.strokeStyle = `rgba(160,80,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, v.ts * 0.07);
+        ctx.shadowColor = '#7c4dff'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(px - perpX, py - perpY);
+        ctx.lineTo(px + perpX, py + perpY);
+        ctx.stroke();
+        // Leading glow dot
+        ctx.beginPath(); ctx.arc(px, py, v.ts*0.06, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(200,140,255,${alpha.toFixed(3)})`; ctx.fill();
+        break;
+      }
+
+      case 'line_shot': {
+        // Thin line from caster to target, fades
+        const alpha = 1 - t;
+        ctx.strokeStyle = `rgba(${v.color},${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+        ctx.lineCap = 'round';
+        ctx.shadowColor = `rgba(${v.color},0.8)`; ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.moveTo(v.ux, v.uy); ctx.lineTo(v.cx, v.cy); ctx.stroke();
+        // Arrowhead dot at target end
+        const dotAlpha = (1-t) * 0.9;
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, v.ts*0.06, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(${v.color},${dotAlpha.toFixed(3)})`; ctx.fill();
+        break;
+      }
+
+      case 'impact_burst': {
+        // Expanding starburst, fades
+        const alpha = 1 - t;
+        const r = t * v.ts * 0.72;
+        const rays = 8;
+        ctx.strokeStyle = `rgba(${v.color},${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.045);
+        ctx.lineCap = 'round';
+        for(let i=0; i<rays; i++){
+          const a = (i/rays)*Math.PI*2;
+          const inner = r*0.2, outer = r;
+          ctx.beginPath();
+          ctx.moveTo(v.cx + Math.cos(a)*inner, v.cy + Math.sin(a)*inner);
+          ctx.lineTo(v.cx + Math.cos(a)*outer, v.cy + Math.sin(a)*outer);
+          ctx.stroke();
+        }
+        // Core flash
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r*0.3, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(${v.color},${(alpha*0.6).toFixed(3)})`; ctx.fill();
+        break;
+      }
+
+      case 'barrier_ring': {
+        // Blue/teal expanding ring
+        const r = t * v.ts * 0.62 + v.ts * 0.32;
+        const alpha = t < 0.6 ? 1 : 1-(t-0.6)/0.4;
+        ctx.strokeStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, v.ts * 0.07);
+        ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r, 0, Math.PI*2); ctx.stroke();
+        // Inner shimmer
+        ctx.strokeStyle = `rgba(180,240,255,${(alpha*0.4).toFixed(3)})`;
+        ctx.lineWidth = Math.max(1, v.ts*0.03);
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r*0.6, 0, Math.PI*2); ctx.stroke();
+        break;
+      }
+
+      case 'smoke': {
+        // Expanding grey cloud
+        const r = t * v.ts * 1.1;
+        const alpha = t < 0.5 ? t*1.2 : (1-t)*1.2;
+        const grd = ctx.createRadialGradient(v.cx, v.cy, 0, v.cx, v.cy, r);
+        grd.addColorStop(0,   `rgba(170,185,195,${(alpha*0.7).toFixed(3)})`);
+        grd.addColorStop(0.5, `rgba(120,135,145,${(alpha*0.5).toFixed(3)})`);
+        grd.addColorStop(1,   `rgba(80,90,100,0)`);
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r, 0, Math.PI*2);
+        ctx.fillStyle = grd; ctx.fill();
+        break;
+      }
+
+      case 'steal_mana': {
+        // Blue particles flowing from target toward caster
+        const particleCount = 5;
+        for(let i=0; i<particleCount; i++){
+          const phase = ((t * 1.4) + i/particleCount) % 1;
+          if(phase > 1) continue;
+          const alpha = phase < 0.8 ? 1 : 1-(phase-0.8)/0.2;
+          const px = v.cx + (v.ux - v.cx) * phase;
+          const py = v.cy + (v.uy - v.cy) * phase;
+          const wobble = Math.sin(phase * Math.PI * 4 + i) * v.ts * 0.09;
+          const perpX = -(v.cy - v.uy) / Math.hypot(v.cx-v.ux, v.cy-v.uy) * wobble;
+          const perpY =  (v.cx - v.ux) / Math.hypot(v.cx-v.ux, v.cy-v.uy) * wobble;
+          ctx.beginPath(); ctx.arc(px+perpX, py+perpY, Math.max(2, v.ts*0.055), 0, Math.PI*2);
+          ctx.fillStyle = `rgba(80,150,255,${alpha.toFixed(3)})`; ctx.fill();
+          ctx.shadowColor = '#2196f3'; ctx.shadowBlur = 6;
+        }
+        break;
+      }
+    }
+  }
+
+  return { spawnForAbility, drawAll };
+})();
+
+// --- SECTION: Renderer ---
+const Renderer = (() => {
+  let _canvas=null,_ctx=null,_ts=CONFIG.TILE_SIZE;
+  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡'};
+
+  function init(canvas){
+    _canvas=canvas; _ctx=canvas.getContext('2d');
+    // Fit canvas to available space between header and footer
+    const container = document.getElementById('canvas-container');
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const sm = Math.min(cw, ch);
+    _ts = Math.min(80, Math.max(CONFIG.MIN_TILE_SIZE, Math.floor(sm / CONFIG.GRID_COLS)));
+    _canvas.width  = _ts * CONFIG.GRID_COLS;
+    _canvas.height = _ts * CONFIG.GRID_ROWS;
+    _ctx.imageSmoothingEnabled = false;
+    // Invalidate grain cache on resize
+    _grainPattern = null;
+    _grainTs = 0;
+    return _ts;
+  }
+
+  function getTileColor(tile){
+    return {normal:CONFIG.COLORS.TILE_NORMAL,high:CONFIG.COLORS.TILE_HIGH,obstacle:CONFIG.COLORS.TILE_OBSTACLE,water:CONFIG.COLORS.TILE_WATER}[tile.terrain]||CONFIG.COLORS.TILE_NORMAL;
+  }
+
+  function drawTile(tile){
+    const {x,y}=tile, px=x*_ts, py=y*_ts, ts=_ts, ctx=_ctx;
+
+    // --- Polished terrain drawing ---
+    switch (tile.terrain) {
+      case 'normal':   drawTerrainNormal(ctx, tile, px, py, ts);   break;
+      case 'high':     drawTerrainHigh(ctx, tile, px, py, ts);     break;
+      case 'water':    drawTerrainWater(ctx, tile, px, py, ts);    break;
+      case 'obstacle': drawTerrainObstacle(ctx, tile, px, py, ts); break;
+      default:
+        ctx.fillStyle = getTileColor(tile);
+        ctx.fillRect(px, py, ts, ts);
+    }
+
+    // Hover highlight
+    if(GameState.hoveredTile&&GameState.hoveredTile.x===x&&GameState.hoveredTile.y===y&&tile.terrain!=='obstacle'&&tile.terrain!=='water'){
+      ctx.fillStyle=CONFIG.COLORS.TILE_HOVER; ctx.fillRect(px,py,ts,ts);
+    }
+
+    // Move range highlight
+    if(GameState.validMoveTiles.some(t=>t.x===x&&t.y===y)){
+      ctx.fillStyle=CONFIG.COLORS.TILE_HIGHLIGHT; ctx.fillRect(px,py,ts,ts);
+      ctx.strokeStyle='rgba(80,200,255,0.75)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+      ctx.strokeRect(px+2,py+2,ts-4,ts-4); ctx.setLineDash([]);
+    }
+
+    // Target highlight
+    if(GameState.validTargetTiles.some(t=>t.x===x&&t.y===y)){
+      const isHeal=GameState.pendingAbility&&ABILITIES[GameState.pendingAbility]&&ABILITIES[GameState.pendingAbility].type==='heal';
+      ctx.fillStyle=isHeal?CONFIG.COLORS.TILE_HEAL_TARGET:CONFIG.COLORS.TILE_TARGET; ctx.fillRect(px,py,ts,ts);
+      ctx.strokeStyle=isHeal?'rgba(80,255,120,0.85)':'rgba(255,80,80,0.85)'; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+      ctx.strokeRect(px+2,py+2,ts-4,ts-4); ctx.setLineDash([]);
+    }
+
+    // Grid line
+    ctx.strokeStyle=CONFIG.COLORS.TILE_BORDER; ctx.lineWidth=0.5; ctx.strokeRect(px,py,ts,ts);
+
+    // Elevation badge — tile-relative font
+    if(tile.elevation!==0){
+      const elFs = Math.max(7, Math.floor(ts * 0.15));
+      ctx.font=`${elFs}px monospace`; ctx.fillStyle='rgba(180,200,220,0.38)';
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(tile.elevation>0?`+${tile.elevation}`:`${tile.elevation}`,px+3,py+3);
+    }
+  }
+
+  function drawUnit(unit){
+    const {x,y}=unit, px=x*_ts, py=y*_ts, ts=_ts, ctx=_ctx;
+    const isSel=GameState.selectedUnit===unit.id, isAct=GameState.currentTurn===unit.id;
+    const isP=unit.team==='player', tc=isP?CONFIG.COLORS.TEAM_PLAYER:CONFIG.COLORS.TEAM_ENEMY;
+    const cx=px+ts/2, cy=py+ts/2, rad=ts*0.31;
+    const accent=CONFIG.COLORS.JOB_ACCENT[unit.job]||'#90caf9';
+    const job=unit.job;
+
+    // Selection ring
+    if(isSel){
+      ctx.save();
+      ctx.shadowColor=CONFIG.COLORS.TILE_SELECTED;
+      ctx.shadowBlur=14;
+      ctx.strokeStyle=CONFIG.COLORS.TILE_SELECTED;
+      ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(cx,cy,rad+6,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Active-turn dashed ring
+    if(isAct){
+      ctx.save();
+      ctx.strokeStyle=CONFIG.COLORS.TURN_INDICATOR;
+      ctx.lineWidth=1.8; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.arc(cx,cy,rad+9,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // Drop shadow ellipse
+    ctx.beginPath();
+    ctx.ellipse(cx,py+ts-5,rad*0.75,rad*0.22,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
+
+    // ── Job-specific shape decorations (drawn before body) ──────
+    if(job==='Dark Knight'||job==='Berserker'){
+      // Jagged angular accent marks around circle
+      ctx.save();
+      const spikes=6;
+      const spikeOuter=rad+ts*0.13, spikeInner=rad+ts*0.04;
+      ctx.strokeStyle=accent; ctx.lineWidth=1.5; ctx.globalAlpha=0.75;
+      for(let i=0;i<spikes;i++){
+        const a0=(i/spikes)*Math.PI*2-Math.PI/2;
+        const a1=((i+0.5)/spikes)*Math.PI*2-Math.PI/2;
+        const a2=((i+1)/spikes)*Math.PI*2-Math.PI/2;
+        const ox=Math.cos(a0)*spikeInner, oy=Math.sin(a0)*spikeInner;
+        const mx=Math.cos(a1)*spikeOuter, my2=Math.sin(a1)*spikeOuter;
+        const ex=Math.cos(a2)*spikeInner, ey=Math.sin(a2)*spikeInner;
+        ctx.beginPath();
+        ctx.moveTo(cx+ox, cy+oy);
+        ctx.lineTo(cx+mx, cy+my2);
+        ctx.lineTo(cx+ex, cy+ey);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if(job==='Archer'||job==='Thief'){
+      // Sharp outer ring (thinner, agile feel)
+      ctx.save();
+      ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
+      ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.arc(cx,cy,rad+ts*0.09,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // Unit body — gradient fill using team color
+    const effectiveRad = (job==='Archer'||job==='Thief') ? rad*0.92 : rad;
+    ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2);
+    const g=ctx.createRadialGradient(cx-effectiveRad*0.3,cy-effectiveRad*0.3,effectiveRad*0.08,cx,cy,effectiveRad);
+    g.addColorStop(0,isP?'#7bdcfc':'#f48880');
+    g.addColorStop(1,isP?'#1565c0':'#b71c1c');
+    ctx.fillStyle=g; ctx.fill();
+
+    // Job-specific border style
+    if(job==='Knight'||job==='Paladin'){
+      // Thick solid border — defensive, sturdy
+      ctx.strokeStyle=accent; ctx.lineWidth=isSel?3.5:2.8;
+      ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
+    } else if(job==='Mage'||job==='Healer'){
+      // Normal border + inner glow ring
+      ctx.strokeStyle=tc; ctx.lineWidth=isSel?2.5:1.5;
+      ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
+      ctx.save();
+      ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.globalAlpha=0.55;
+      ctx.shadowColor=accent; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(cx,cy,effectiveRad*0.68,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    } else {
+      // Default border using accent
+      ctx.strokeStyle=accent; ctx.lineWidth=isSel?2.5:1.8;
+      ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
+    }
+
+    // Job icon — tile-relative font
+    const iconFs = Math.max(10, Math.floor(ts * 0.3));
+    ctx.font=`bold ${iconFs}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#fff'; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=4;
+    ctx.fillText(ICON_CHARS[unit.job]||'*',cx,cy); ctx.shadowBlur=0;
+
+    // Status effect icons — tile-relative font
+    if(unit.statusEffects&&unit.statusEffects.length>0){
+      const SI={poison:'☠',stun:'★',slow:'⧖',shield:'◉'};
+      const seFs = Math.max(7, Math.floor(ts * 0.17));
+      unit.statusEffects.forEach((se,i)=>{
+        ctx.font=`${seFs}px serif`;
+        ctx.textAlign='left'; ctx.textBaseline='top';
+        ctx.fillStyle=se.name==='poison'?'#a0ff60':se.name==='stun'?'#ffee00':'#80c8ff';
+        ctx.shadowColor='#000'; ctx.shadowBlur=3;
+        ctx.fillText(SI[se.name]||'?', px+2+i*Math.floor(ts*0.19), py+ts*0.42);
+        ctx.shadowBlur=0;
+      });
+    }
+
+    // HP bar
+    const bw=ts-8, bh=Math.max(4,Math.floor(ts*0.08));
+    const bx=px+4, by=py+ts-bh-5;
+    const hp=unit.hp/unit.maxHp;
+    ctx.fillStyle=CONFIG.COLORS.HP_BAR_BG; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=hp>0.5?CONFIG.COLORS.HP_BAR_FILL:hp>0.25?'#ffc107':'#f44336';
+    ctx.fillRect(bx,by,Math.round(bw*hp),bh);
+    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
+
+    // Unit name — tile-relative font
+    const nfs=Math.max(8, Math.floor(ts*0.135));
+    ctx.font=`${nfs}px 'Courier New',monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillStyle=tc; ctx.shadowColor='#000'; ctx.shadowBlur=3;
+    ctx.fillText(unit.name,cx,py+4+nfs); ctx.shadowBlur=0;
+  }
+
+  // --- SECTION: HUD Polish ---
+  function drawUI(){
+    const ctx=_ctx, cw=_canvas.width, ch=_canvas.height;
+    const au=getUnit(GameState.currentTurn); if(!au)return;
+
+    // Compute font sizes relative to canvas width and tile size
+    const uf = Math.max(8, Math.min(Math.floor(_ts*0.155), Math.floor(cw*0.022)));
+    const ph = Math.max(22, Math.floor(_ts*0.38));
+
+    // ── Top strip ──────────────────────────────────────────────
+    // Background with subtle gradient
+    const topGrad = ctx.createLinearGradient(0, 0, 0, ph);
+    topGrad.addColorStop(0, 'rgba(4,8,18,0.98)');
+    topGrad.addColorStop(1, 'rgba(8,16,28,0.94)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, cw, ph);
+
+    // Accent border line
+    ctx.strokeStyle = CONFIG.COLORS.ACCENT;
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(0, 0, cw, ph);
+
+    // Bottom glow of top strip
+    const grd = ctx.createLinearGradient(0, ph-2, 0, ph+3);
+    grd.addColorStop(0, 'rgba(0,229,255,0.25)');
+    grd.addColorStop(1, 'rgba(0,229,255,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, ph-2, cw, 5);
+
+    // Round number badge
+    const roundLabel = `R${(GameState.turnNumber||0)+1}`;
+    const rndFs = Math.max(7, Math.floor(uf * 0.85));
+    ctx.font = `bold ${rndFs}px 'Courier New',monospace`;
+    const rndW = ctx.measureText(roundLabel).width + 8;
+    const rndX = 4, rndY = Math.floor((ph - rndFs - 4) / 2);
+    ctx.fillStyle = 'rgba(0,60,80,0.7)';
+    ctx.fillRect(rndX, rndY, rndW, rndFs + 4);
+    ctx.strokeStyle = 'rgba(0,229,255,0.4)';
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(rndX, rndY, rndW, rndFs + 4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = CONFIG.COLORS.ACCENT;
+    ctx.fillText(roundLabel, rndX + rndW / 2, rndY + (rndFs + 4) / 2);
+
+    // Active unit info
+    const tc = au.team==='player' ? CONFIG.COLORS.TEAM_PLAYER : CONFIG.COLORS.TEAM_ENEMY;
+    const infoX = rndX + rndW + 6;
+
+    ctx.font = `bold ${uf}px 'Courier New',monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = CONFIG.COLORS.TURN_INDICATOR;
+    ctx.fillText('►', infoX, ph / 2);
+
+    const arrowW = ctx.measureText('► ').width;
+    ctx.fillStyle = tc;
+    ctx.fillText(`${au.name}`, infoX + arrowW, ph / 2);
+    const nameW = ctx.measureText(`${au.name} `).width;
+
+    ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+    ctx.font = `${Math.max(7, Math.floor(uf * 0.85))}px 'Courier New',monospace`;
+    ctx.fillText(`(${au.job})`, infoX + arrowW + nameW, ph / 2);
+
+    // Turn queue preview — right side
+    // Show up to 4 upcoming units
+    const qp = [GameState.currentTurn, ...GameState.turnQueue].slice(0, 5);
+    let qx = cw - 4;
+    ctx.font = `${Math.max(7, Math.floor(uf * 0.88))}px 'Courier New',monospace`;
+    ctx.textBaseline = 'middle';
+    for (let i = qp.length - 1; i >= 0; i--) {
+      const u = getUnit(qp[i]); if (!u) continue;
+      const qc = u.team==='player' ? CONFIG.COLORS.TEAM_PLAYER : CONFIG.COLORS.TEAM_ENEMY;
+      ctx.font = `${i===0 ? 'bold ' : ''}${Math.max(7, Math.floor(uf*(i===0?1:0.85)))}px 'Courier New',monospace`;
+      // Pulse the active unit name in the queue
+      if(i===0){
+        const pulse = 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(Date.now() * 0.005));
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = CONFIG.COLORS.TURN_INDICATOR;
+      } else {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = qc;
+      }
+      ctx.textAlign = 'right';
+      ctx.fillText(u.name, qx, ph / 2);
+      ctx.globalAlpha = 1;
+      qx -= ctx.measureText(u.name).width + 8;
+      if (i > 0) {
+        ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+        ctx.fillText('→', qx + 4, ph / 2);
+        qx -= 11;
+      }
+    }
+
+    // ── Bottom strip (selected unit detail) ────────────────────
+    const sel = getUnit(GameState.selectedUnit);
+    if (sel && !GameState.showActionMenu) {
+      const dh = Math.max(36, Math.floor(_ts * 0.58));
+      const dy = ch - dh;
+
+      // Background gradient
+      const botGrad = ctx.createLinearGradient(0, dy, 0, ch);
+      botGrad.addColorStop(0, 'rgba(8,16,28,0.94)');
+      botGrad.addColorStop(1, 'rgba(4,8,18,0.98)');
+      ctx.fillStyle = botGrad;
+      ctx.fillRect(0, dy, cw, dh);
+
+      // Top glow line
+      const glowGrd = ctx.createLinearGradient(0, dy-3, 0, dy+2);
+      glowGrd.addColorStop(0, 'rgba(0,229,255,0)');
+      glowGrd.addColorStop(1, 'rgba(0,229,255,0.22)');
+      ctx.fillStyle = glowGrd;
+      ctx.fillRect(0, dy - 3, cw, 5);
+
+      const sc = sel.team==='player' ? CONFIG.COLORS.TEAM_PLAYER : CONFIG.COLORS.TEAM_ENEMY;
+      ctx.strokeStyle = sc;
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(0, dy, cw, dh);
+
+      // Name + job
+      const bUf = Math.max(8, Math.floor(uf * 1.05));
+      ctx.font = `bold ${bUf}px 'Courier New',monospace`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillStyle = sc;
+      ctx.fillText(`${sel.name}`, 8, dy + 5);
+      const snw = ctx.measureText(`${sel.name} `).width;
+
+      ctx.font = `${Math.max(7, Math.floor(bUf * 0.8))}px 'Courier New',monospace`;
+      ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+      ctx.fillText(`· ${sel.job}`, 8 + snw, dy + 6);
+
+      // Stats row
+      const suf = Math.max(7, Math.floor(uf * 0.82));
+      ctx.font = `${suf}px 'Courier New',monospace`;
+      ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`ATK:${sel.attack}  DEF:${sel.defense}  MOV:${sel.moveRange}  SPD:${sel.speed}`, 8, dy + dh - 4);
+
+      // Abilities list (right side)
+      ctx.font = `${Math.max(7, Math.floor(suf * 0.9))}px 'Courier New',monospace`;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = CONFIG.COLORS.ACCENT;
+      const abText = sel.abilities.join(' · ');
+      // Truncate if too wide
+      const maxAbW = cw * 0.45;
+      let abDisplay = abText;
+      while (ctx.measureText(abDisplay).width > maxAbW && abDisplay.length > 3) {
+        abDisplay = abDisplay.slice(0, abDisplay.lastIndexOf(' ·'));
+        if (!abDisplay.includes('·')) break;
+      }
+      ctx.fillText(abDisplay, cw - 6, dy + dh - 4);
+
+      // ── Mini HP and MP bars ──────────────────────────────────
+      const barW = Math.min(cw * 0.28, 110);
+      const barH = Math.max(5, Math.floor(dh * 0.14));
+      const barX = 8;
+      const midY = dy + dh * 0.5;
+
+      // HP bar
+      const hpRatio = sel.hp / sel.maxHp;
+      ctx.fillStyle = CONFIG.COLORS.HP_BAR_BG;
+      ctx.fillRect(barX, midY - barH - 2, barW, barH);
+      ctx.fillStyle = hpRatio > 0.5 ? CONFIG.COLORS.HP_BAR_FILL : hpRatio > 0.25 ? '#ffc107' : '#f44336';
+      ctx.fillRect(barX, midY - barH - 2, Math.round(barW * hpRatio), barH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5;
+      ctx.strokeRect(barX, midY - barH - 2, barW, barH);
+      // HP label
+      const barLabelFs = Math.max(7, Math.floor(barH * 1.1));
+      ctx.font = `${barLabelFs}px 'Courier New',monospace`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#4caf50';
+      ctx.fillText(`HP`, barX, midY - barH * 0.5 - 2 - barH - 1);
+
+      // HP numbers right of bar
+      ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+      ctx.textAlign = 'left';
+      ctx.fillText(`${sel.hp}/${sel.maxHp}`, barX + barW + 4, midY - barH - 2 + barH / 2);
+
+      // MP bar
+      const mpRatio = sel.maxMp > 0 ? sel.mp / sel.maxMp : 0;
+      ctx.fillStyle = CONFIG.COLORS.HP_BAR_BG;
+      ctx.fillRect(barX, midY + 2, barW, barH);
+      ctx.fillStyle = CONFIG.COLORS.MP_BAR_FILL;
+      ctx.fillRect(barX, midY + 2, Math.round(barW * mpRatio), barH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5;
+      ctx.strokeRect(barX, midY + 2, barW, barH);
+      // MP label
+      ctx.fillStyle = '#2196f3';
+      ctx.fillText(`MP`, barX, midY + 2 + barH / 2 - barH - 1);
+
+      // MP numbers
+      ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
+      ctx.textAlign = 'left';
+      ctx.fillText(`${sel.mp}/${sel.maxMp}`, barX + barW + 4, midY + 2 + barH / 2);
+    }
+  }
+
+  function drawFloatingTexts(){
+    const ctx=_ctx,ts=_ts;
+    GameState.floatingTexts=GameState.floatingTexts.filter(ft=>ft.age<ft.maxAge);
+    for(const ft of GameState.floatingTexts){
+      const alpha=1-ft.age/ft.maxAge, rise=(ft.age/ft.maxAge)*ts*0.8;
+      const ftFs = Math.max(10, Math.floor(ts * 0.27));
+      ctx.save(); ctx.globalAlpha=alpha;
+      ctx.font=`bold ${ftFs}px 'Courier New',monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=ft.color||'#fff'; ctx.shadowColor='#000'; ctx.shadowBlur=5;
+      ctx.fillText(ft.text,ft.x*ts+ts/2,ft.y*ts+ts/2-rise);
+      ctx.restore(); ft.age++;
+    }
+    if(GameState.floatingTexts.length>0) requestAnimationFrame(()=>Renderer.draw());
+  }
+
+  function draw(){
+    if(!_ctx)return;
+    _ctx.clearRect(0,0,_canvas.width,_canvas.height);
+    for(let r=0;r<CONFIG.GRID_ROWS;r++) for(let c=0;c<CONFIG.GRID_COLS;c++) drawTile(GameState.map[r][c]);
+
+    // Selected unit tile highlight
+    if(GameState.selectedUnit){
+      const su=getUnit(GameState.selectedUnit);
+      if(su){ _ctx.fillStyle=CONFIG.COLORS.TILE_SELECTED; _ctx.fillRect(su.x*_ts,su.y*_ts,_ts,_ts); }
+    }
+
+    GameState.units.forEach(u=>{ if(u.hp>0)drawUnit(u); });
+    drawUI();
+    drawFloatingTexts();
+    if(GameState.showActionMenu&&GameState.actionMenuUnit) ActionMenu.draw(_ctx,_canvas.width,_canvas.height,_ts);
+    VFXSystem.drawAll(_ctx);
+  }
+
+  function getTileSize(){ return _ts; }
+  return { init, draw, getTileSize };
+})();
+
+// --- SECTION: Utility Helpers ---
+function getUnit(id){ return GameState.units.find(u=>u.id===id)||null; }
+function getUnitAt(x,y){ return GameState.units.find(u=>u.x===x&&u.y===y&&u.hp>0)||null; }
+function syncMapOccupancy(){
+  for(let r=0;r<CONFIG.GRID_ROWS;r++) for(let c=0;c<CONFIG.GRID_COLS;c++) GameState.map[r][c].occupied=false;
+  GameState.units.forEach(u=>{ if(u.hp>0)GameState.map[u.y][u.x].occupied=true; });
+}
+
+// --- SECTION: Core Event Listeners ---
+function registerCoreListeners(){
+  GameEvents.on('turn:start',({unit,turnNumber})=>{
+    console.log(`%c[Turn Start] Round ${turnNumber+1} — ${unit.name} (${unit.team})`,'color:#ffd740;font-weight:bold');
+    if(GameState._skipCurrentTurn){
+      GameState._skipCurrentTurn=false;
+      console.log(`%c[Status] ${unit.name} is stunned — skipping turn.`,'color:#ffee00');
+      GameState.floatingTexts.push({x:unit.x,y:unit.y,text:'STUNNED!',color:'#ffee00',age:0,maxAge:40});
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(),700);
+      return;
+    }
+    if(unit.team==='enemy'){
+      setTimeout(()=>AISystem.doTurn(unit), 500);
+    } else {
+      GameState.selectedUnit=unit.id;
+      GameState.validMoveTiles=MovementSystem.getReachableTiles(unit);
+      Renderer.draw();
+    }
+  });
+  GameEvents.on('turn:end',({unit})=>console.log(`%c[Turn End] ${unit.name}'s turn over`,'color:#607080'));
+  GameEvents.on('unit:selected',({unit,canAct})=>console.log(`[Selected] ${unit.name} canAct:${canAct}`));
+  GameEvents.on('unit:moved',({unit,toX,toY})=>console.log(`[Move] ${unit.name} → (${toX},${toY})`));
+  GameEvents.on('unit:damaged',({unit,damage})=>{
+    GameState.floatingTexts.push({x:unit.x,y:unit.y,text:`-${damage}`,color:'#ff5555',age:0,maxAge:30});
+    Renderer.draw();
+  });
+  GameEvents.on('unit:healed',({unit,amount})=>{
+    GameState.floatingTexts.push({x:unit.x,y:unit.y,text:`+${amount}`,color:'#55ff88',age:0,maxAge:30});
+    Renderer.draw();
+  });
+  GameEvents.on('unit:defeated',({unit})=>{
+    GameState.floatingTexts.push({x:unit.x,y:unit.y,text:'KO!',color:'#ffcc00',age:0,maxAge:45});
+    Renderer.draw();
+  });
+  GameEvents.on('unit:statusApplied',({unit,effect})=>{
+    GameState.floatingTexts.push({x:unit.x,y:unit.y,text:effect.toUpperCase(),color:effect==='poison'?'#a0ff60':effect==='stun'?'#ffee00':'#80c8ff',age:0,maxAge:35});
+  });
+  GameEvents.on('ability:used',({unit,abilityId,targetX,targetY})=>{
+    console.log(`[Ability] ${unit.name} used ${abilityId}`);
+    VFXSystem.spawnForAbility(unit, abilityId, targetX, targetY);
+  });
+  // NOTE: battle:win and battle:loss are handled exclusively by NarrativeController._registerBattleEvents()
+
+  // ── Pulse driver: keeps HUD turn-queue name pulsing while in battle ──
+  // Only runs at ~12fps to stay cheap. Stops itself when battle ends.
+  let _pulseRafId = null;
+  function _pulseTick(){
+    if(GameState.phase !== 'battle'){ _pulseRafId = null; return; }
+    // Only redraw if no other animation is already driving frames
+    if(GameState.floatingTexts.length === 0 && GameState.activeVFX.length === 0){
+      Renderer.draw();
+    }
+    _pulseRafId = setTimeout(()=>requestAnimationFrame(_pulseTick), 80);
+  }
+  // Kick off pulse loop on first turn:start
+  GameEvents.once('turn:start', () => { if(!_pulseRafId) _pulseTick(); });
+}
+
+function showEndScreen(title,color,message){
+  const o=document.getElementById('end-overlay'); if(!o)return;
+  o.querySelector('#end-title').textContent=title;
+  o.querySelector('#end-title').style.color=color;
+  o.querySelector('#end-message').textContent=message;
+  o.style.display='flex';
+}
+
+// --- SECTION: Init ---
+let _coreListenersRegistered = false;
+const _origRegisterCoreListeners = registerCoreListeners;
+registerCoreListeners = function() {
+  if (_coreListenersRegistered) return;
+  _coreListenersRegistered = true;
+  _origRegisterCoreListeners();
+};
+
+function init(){
+  const canvas=document.getElementById('game-canvas');
+  if(!canvas){console.error('[Engine] No #game-canvas');return;}
+
+  // Load map_1 to populate units and map
+  MapSystem.load('map_1');
+
+  const ts=Renderer.init(canvas);
+  InputManager.attach(canvas,ts);
+  registerCoreListeners();
+
+  // Start water animation if needed
+  WaterAnim.check();
+
+  // TurnSystem.start() is NOT called here — NarrativeController.begin() owns startup
+  // so the title screen can intercept first. Renderer.draw() gives an initial frame.
+  Renderer.draw();
+
+  // Update map button label
+  const btn = document.getElementById('map-select-btn');
+  if (btn) btn.textContent = `${MAP_DEFINITIONS['map_1'].label.split(' ')[0].toUpperCase()} ▸`;
+
+  window.addEventListener('resize',()=>{
+    const ns=Renderer.init(canvas);
+    InputManager.setCanvas(canvas,ns);
+    WaterAnim.check();
+    Renderer.draw();
+  });
+
+  console.log('%c[GameEngine] Initialized','color:#00e5ff;font-weight:bold');
+}
+
+window.GameEngine={init,GameEvents,GameState,schemas:{UnitSchema,TileSchema,GameStateSchema},utils:{getUnit,getUnitAt,syncMapOccupancy},systems:{TurnSystem,MovementSystem,InputManager,Renderer,MapSystem},config:CONFIG};
+window.MovementSystem=MovementSystem;
+</script>
+
+<!-- ============================================================
+     EXTENSION: Job System, Ability System, Combat, Status, AI
+     ============================================================ -->
+<script>
+
+// --- SECTION: Job Definitions ---
+const JOBS = {
+  'Knight':     { label:'Knight',     icon:'⚔', baseStats:{ maxHp:140, maxMp:20,  attack:16, defense:16, speed:3, moveRange:3 }, abilities:['Attack','Shield Bash','Wait'], description:'Stalwart defender. High HP/DEF, low SPD.' },
+  'Mage':       { label:'Mage',       icon:'✦', baseStats:{ maxHp:65,  maxMp:90,  attack:24, defense:5,  speed:8, moveRange:4 }, abilities:['Attack','Fireball','Heal','Wait'], description:'Arcane wielder. High MP/ATK, fragile.' },
+  'Archer':     { label:'Archer',     icon:'◎', baseStats:{ maxHp:85,  maxMp:20,  attack:15, defense:8,  speed:6, moveRange:3 }, abilities:['Attack','Arrow Shot','Wait'], description:'Ranged combatant. Balanced stats.' },
+  'Dark Knight':{ label:'Dark Knight',icon:'☽', baseStats:{ maxHp:115, maxMp:50,  attack:22, defense:12, speed:4, moveRange:2 }, abilities:['Attack','Dark Wave','Wait'], description:'Shadowy warrior. High ATK, costs MP.' },
+  'Healer':     { label:'Healer',     icon:'✚', baseStats:{ maxHp:75,  maxMp:100, attack:8,  defense:8,  speed:7, moveRange:4 }, abilities:['Attack','Mend','Revive','Wait'],          description:'Support caster. High MP, low ATK.' },
+  'Thief':      { label:'Thief',      icon:'◈', baseStats:{ maxHp:80,  maxMp:40,  attack:14, defense:6,  speed:9, moveRange:5 }, abilities:['Attack','Steal Mana','Smoke Bomb','Wait'], description:'Swift rogue. High SPD and move range.' },
+  'Paladin':    { label:'Paladin',    icon:'✦', baseStats:{ maxHp:120, maxMp:60,  attack:14, defense:18, speed:4, moveRange:3 }, abilities:['Attack','Holy Lance','Barrier','Wait'],    description:'Holy defender. High DEF, ranged strike.' },
+  'Berserker':  { label:'Berserker',  icon:'⚡', baseStats:{ maxHp:130, maxMp:0,   attack:28, defense:7,  speed:5, moveRange:3 }, abilities:['Attack','Rampage','Wait'],                description:'Unstoppable berserker. Extreme ATK.' },
+};
+
+// --- SECTION: Ability Definitions ---
+const ABILITIES = {
+  'Attack':     { id:'Attack',     name:'Attack',     icon:'⚔', power:10, mpCost:0,  range:1, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Basic melee strike.' },
+  'Shield Bash':{ id:'Shield Bash',name:'Shield Bash',icon:'O', power:6,  mpCost:0,  range:1, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:'stun',  statusChance:0.5, pushBack:true,  description:'Bash with shield. May stun & push back.' },
+  'Fireball':   { id:'Fireball',   name:'Fireball',   icon:'*', power:18, mpCost:20, range:3, targetType:'any',   type:'damage', aoe:true,
+    aoeTiles:(tx,ty)=>{ const t=[]; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)t.push({x:tx+dx,y:ty+dy}); return t; },
+    statusEffect:null, statusChance:0, pushBack:false, description:'AoE blast 1-tile radius. 20 MP.' },
+  'Heal':       { id:'Heal',       name:'Heal',       icon:'+', power:25, mpCost:15, range:2, targetType:'ally',  type:'heal',   aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Restore HP to ally. 15 MP.' },
+  'Arrow Shot': { id:'Arrow Shot', name:'Arrow Shot', icon:'~', power:12, mpCost:0,  range:2, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:'slow', statusChance:0.3, pushBack:false, description:'2-tile ranged attack. May slow.' },
+  'Dark Wave':  { id:'Dark Wave',  name:'Dark Wave',  icon:')', power:20, mpCost:18, range:3, targetType:'any',   type:'damage', aoe:true,
+    aoeTiles:(tx,ty,caster)=>{
+      if(!caster)return[{x:tx,y:ty}];
+      const dx=Math.sign(tx-caster.x),dy=Math.sign(ty-caster.y);
+      const t=[]; let cx=caster.x+dx,cy=caster.y+dy;
+      for(let i=0;i<4;i++){
+        if(cx<0||cy<0||cx>=CONFIG.GRID_COLS||cy>=CONFIG.GRID_ROWS)break;
+        t.push({x:cx,y:cy}); cx+=dx; cy+=dy;
+      }
+      return t;
+    },
+    statusEffect:'poison', statusChance:0.4, pushBack:false, description:'Line attack. May poison. 18 MP.' },
+  'Wait':       { id:'Wait',       name:'Wait',       icon:'z', power:0,  mpCost:0,  range:0, targetType:'self',  type:'wait',   aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'End your turn.' },
+  'Mend':       { id:'Mend',       name:'Mend',       icon:'+', power:18, mpCost:8,  range:2, targetType:'ally',  type:'heal',      aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Restore HP to nearby ally. 8 MP.' },
+  'Revive':     { id:'Revive',     name:'Revive',     icon:'✚', power:0,  mpCost:30, range:1, targetType:'ally',  type:'revive',    aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Restore fallen ally to 25% HP. 30 MP.' },
+  'Steal Mana': { id:'Steal Mana', name:'Steal Mana', icon:'◈', power:4,  mpCost:0,  range:1, targetType:'enemy', type:'steal_mp',  aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Drain 20 MP from target. Deals minor damage.' },
+  'Smoke Bomb': { id:'Smoke Bomb', name:'Smoke Bomb', icon:'◎', power:0,  mpCost:12, range:0, targetType:'self',  type:'smoke',     aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Slow & push back all adjacent enemies. 12 MP.' },
+  'Holy Lance': { id:'Holy Lance', name:'Holy Lance', icon:'†', power:16, mpCost:10, range:2, targetType:'enemy', type:'piercing',  aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Ranged holy strike. Ignores 50% DEF. 10 MP.' },
+  'Barrier':    { id:'Barrier',    name:'Barrier',    icon:'◉', power:0,  mpCost:14, range:2, targetType:'ally',  type:'buff',      aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Grant ally a damage-absorbing shield. 14 MP.' },
+  'Rampage':    { id:'Rampage',    name:'Rampage',    icon:'⚡', power:14, mpCost:0,  range:1, targetType:'any',   type:'damage',    aoe:true,
+    aoeTiles:(tx,ty,caster)=>{ const t=[]; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy}); return t; },
+    statusEffect:null, statusChance:0, pushBack:false, description:'Strike all surrounding tiles.' },
+};
+
+// --- SECTION: Combat Math ---
+const CombatMath = {
+  calcDamage(attacker, defender, ability){
+    let base = Math.max(1, ability.power + attacker.attack - defender.defense);
+    const tile = GameState.map[attacker.y] && GameState.map[attacker.y][attacker.x];
+    if(tile && tile.elevation > 0) base = Math.ceil(base * 1.15);
+    return Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2)));
+  },
+  calcHeal(healer, ability){
+    return Math.round(ability.power + Math.floor(healer.attack * 0.5));
+  },
+};
+
+// --- SECTION: Status System ---
+const StatusSystem = {
+  apply(unit, effectName, turns){
+    unit.statusEffects = unit.statusEffects.filter(se => se.name !== effectName);
+    unit.statusEffects.push({ name:effectName, turnsLeft:turns });
+    GameEvents.emit('unit:statusApplied', { unit, effect:effectName });
+    Renderer.draw();
+  },
+  tick(unit){
+    const expired = [];
+    for(const se of unit.statusEffects){
+      if(se.name === 'poison'){
+        const dmg = 5;
+        unit.hp = Math.max(0, unit.hp - dmg);
+        GameEvents.emit('unit:damaged', { unit, damage:dmg, attackerId:'poison' });
+        GameState.floatingTexts.push({x:unit.x,y:unit.y,text:`☠${dmg}`,color:'#a0ff60',age:0,maxAge:28});
+        if(unit.hp <= 0){
+          GameEvents.emit('unit:defeated', { unit, attackerId:'poison' });
+          GameState.map[unit.y][unit.x].occupied = false;
+        }
+      } else if(se.name === 'stun'){
+        se._wasStunned = true;
+      } else if(se.name === 'slow' && !se._applied){
+        se._originalSpeed = unit.speed;
+        unit.speed = Math.floor(unit.speed / 2);
+        se._applied = true;
+      }
+      se.turnsLeft--;
+      if(se.turnsLeft <= 0){
+        expired.push(se);
+        if(se.name === 'slow' && se._applied && se._originalSpeed !== undefined)
+          unit.speed = se._originalSpeed;
+      }
+    }
+    unit.statusEffects = unit.statusEffects.filter(se => !expired.includes(se));
+    const wasStunned = expired.some(se => se.name === 'stun' && se._wasStunned) ||
+                       unit.statusEffects.some(se => se.name === 'stun' && se._wasStunned);
+    if(wasStunned) GameState._skipCurrentTurn = true;
+  },
+};
+
+// --- SECTION: Ability System ---
+const AbilitySystem = {
+  getAbilities(unit){ return (unit.abilities||[]).map(id=>ABILITIES[id]).filter(Boolean); },
+  canUse(unit, abilityId){
+    const ab = ABILITIES[abilityId]; if(!ab)return false;
+    if(ab.type==='wait')return true;
+    return unit.mp >= ab.mpCost;
+  },
+  getValidTargets(actingUnit, abilityId){
+    const ab = ABILITIES[abilityId]; if(!ab||ab.type==='wait')return [];
+    // Smoke Bomb: self-cast, no tile targeting needed — return caster tile
+    if(ab.type === 'smoke') return [{x:actingUnit.x, y:actingUnit.y}];
+    const targets = [];
+    for(let row=0;row<CONFIG.GRID_ROWS;row++){
+      for(let col=0;col<CONFIG.GRID_COLS;col++){
+        const dist = Math.max(Math.abs(col-actingUnit.x), Math.abs(row-actingUnit.y));
+        const minDist = (ab.targetType === 'ally' || ab.type === 'revive') ? 0 : 1;
+        if(dist < minDist || dist > ab.range) continue;
+        const tile = GameState.map[row][col];
+        if(!tile) continue;
+        if(ab.type === 'revive'){
+          // Target fallen allies (hp === 0)
+          const fallen = GameState.units.find(u => u.x===col && u.y===row && u.hp===0 && u.team===actingUnit.team);
+          if(fallen) targets.push({x:col,y:row});
+        } else if(ab.type === 'buff' || ab.type === 'heal' || ab.targetType === 'ally'){
+          const u = getUnitAt(col, row);
+          if(u && u.team === actingUnit.team) targets.push({x:col,y:row});
+        } else {
+          if(ab.aoe){
+            if(tile.terrain !== 'obstacle') targets.push({x:col,y:row});
+          } else {
+            const u = getUnitAt(col, row);
+            if(u && u.team !== actingUnit.team) targets.push({x:col,y:row});
+          }
+        }
+      }
+    }
+    return targets;
+  },
+  execute(actingUnit, abilityId, targetX, targetY){
+    const ab = ABILITIES[abilityId]; if(!ab)return;
+    if(ab.type === 'wait'){ TurnSystem.endTurn(); return; }
+    if(!this.canUse(actingUnit, abilityId)){
+      GameState.floatingTexts.push({x:actingUnit.x,y:actingUnit.y,text:'NO MP!',color:'#6090ff',age:0,maxAge:30});
+      Renderer.draw(); return;
+    }
+    actingUnit.mp = Math.max(0, actingUnit.mp - ab.mpCost);
+    GameEvents.emit('ability:used', { unit:actingUnit, abilityId, targetX, targetY });
+    // --- Smoke Bomb: hits nearby enemies by distance, not tile loop ---
+    if(ab.type === 'smoke'){
+      const enemies = GameState.units.filter(u => u.team !== actingUnit.team && u.hp > 0);
+      for(const enemy of enemies){
+        const dist = Math.abs(enemy.x - actingUnit.x) + Math.abs(enemy.y - actingUnit.y);
+        if(dist <= 2){
+          StatusSystem.apply(enemy, 'slow', 2);
+          this._applyPushBack(actingUnit, enemy);
+        }
+      }
+      GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(), 400);
+      return;
+    }
+    let affectedTiles = [{x:targetX,y:targetY}];
+    if(ab.aoe && ab.aoeTiles) affectedTiles = ab.aoeTiles(targetX, targetY, actingUnit);
+    for(const tile of affectedTiles){
+      if(tile.x<0||tile.y<0||tile.x>=CONFIG.GRID_COLS||tile.y>=CONFIG.GRID_ROWS)continue;
+      const tu = getUnitAt(tile.x, tile.y);
+      if(ab.type === 'damage'){
+        if(!tu||tu.id===actingUnit.id)continue;
+        if(!ab.aoe && tu.team===actingUnit.team)continue;
+        let dmg = CombatMath.calcDamage(actingUnit, tu, ab);
+        // Shield: halve damage and consume shield
+        const shieldEffect = tu.statusEffects.find(se => se.name === 'shield');
+        if(shieldEffect){
+          dmg = Math.ceil(dmg * 0.5);
+          tu.statusEffects = tu.statusEffects.filter(se => se.name !== 'shield');
+          GameState.floatingTexts.push({x:tu.x,y:tu.y,text:'SHIELD',color:'#ffe066',age:0,maxAge:30});
+        }
+        tu.hp = Math.max(0, tu.hp - dmg);
+        GameEvents.emit('unit:damaged', { unit:tu, damage:dmg, attackerId:actingUnit.id });
+        if(ab.pushBack) this._applyPushBack(actingUnit, tu);
+        if(ab.statusEffect && Math.random() < ab.statusChance) StatusSystem.apply(tu, ab.statusEffect, 2);
+        if(tu.hp <= 0){
+          GameState.map[tu.y][tu.x].occupied = false;
+          GameEvents.emit('unit:defeated', { unit:tu, attackerId:actingUnit.id });
+        }
+      } else if(ab.type === 'heal'){
+        if(!tu||tu.team!==actingUnit.team)continue;
+        const amt = CombatMath.calcHeal(actingUnit, ab);
+        tu.hp = Math.min(tu.maxHp, tu.hp + amt);
+        GameEvents.emit('unit:healed', { unit:tu, amount:amt, sourceId:actingUnit.id });
+      } else if(ab.type === 'revive'){
+        const fallen = GameState.units.find(u => u.x===tile.x && u.y===tile.y && u.hp===0 && u.team===actingUnit.team);
+        if(!fallen) continue;
+        fallen.hp = Math.floor(fallen.maxHp * 0.25);
+        GameState.map[fallen.y][fallen.x].occupied = true;
+        GameEvents.emit('unit:healed', { unit:fallen, amount:fallen.hp, sourceId:actingUnit.id });
+      } else if(ab.type === 'steal_mp'){
+        if(!tu||tu.team===actingUnit.team) continue;
+        const drained = Math.min(20, tu.mp);
+        tu.mp = Math.max(0, tu.mp - 20);
+        actingUnit.mp = Math.min(actingUnit.maxMp, actingUnit.mp + drained);
+        const dmg = Math.max(1, ab.power + actingUnit.attack - tu.defense);
+        tu.hp = Math.max(0, tu.hp - dmg);
+        GameEvents.emit('unit:damaged', { unit:tu, damage:dmg, attackerId:actingUnit.id });
+        GameState.floatingTexts.push({x:tu.x,y:tu.y,text:`-${drained}MP`,color:'#6090ff',age:0,maxAge:30});
+        if(tu.hp <= 0){
+          GameState.map[tu.y][tu.x].occupied = false;
+          GameEvents.emit('unit:defeated', { unit:tu, attackerId:actingUnit.id });
+        }
+      } else if(ab.type === 'piercing'){
+        if(!tu||tu.team===actingUnit.team) continue;
+        const halfDefTu = Object.assign({}, tu, { defense: Math.floor(tu.defense * 0.5) });
+        let dmg = CombatMath.calcDamage(actingUnit, halfDefTu, ab);
+        const shieldEffect = tu.statusEffects.find(se => se.name === 'shield');
+        if(shieldEffect){
+          dmg = Math.ceil(dmg * 0.5);
+          tu.statusEffects = tu.statusEffects.filter(se => se.name !== 'shield');
+          GameState.floatingTexts.push({x:tu.x,y:tu.y,text:'SHIELD',color:'#ffe066',age:0,maxAge:30});
+        }
+        tu.hp = Math.max(0, tu.hp - dmg);
+        GameEvents.emit('unit:damaged', { unit:tu, damage:dmg, attackerId:actingUnit.id });
+        if(tu.hp <= 0){
+          GameState.map[tu.y][tu.x].occupied = false;
+          GameEvents.emit('unit:defeated', { unit:tu, attackerId:actingUnit.id });
+        }
+      } else if(ab.type === 'buff'){
+        if(!tu||tu.team!==actingUnit.team) continue;
+        StatusSystem.apply(tu, 'shield', 1);
+      }
+    }
+    GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+    GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+    Renderer.draw();
+    setTimeout(()=>TurnSystem.endTurn(), 400);
+  },
+  _applyPushBack(attacker, target){
+    const dx=Math.sign(target.x-attacker.x), dy=Math.sign(target.y-attacker.y);
+    const nx=target.x+dx, ny=target.y+dy;
+    if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS)return;
+    const dt=GameState.map[ny][nx];
+    if(dt.terrain==='obstacle'||dt.terrain==='water')return;
+    if(getUnitAt(nx,ny))return;
+    GameState.map[target.y][target.x].occupied=false;
+    target.x=nx; target.y=ny;
+    GameState.map[ny][nx].occupied=true;
+  },
+};
+
+// --- SECTION: Action Menu ---
+const ActionMenu = (() => {
+  let _btns = [];
+  const BTN_MIN_H = 44;
+  function _roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  }
+  const ABILITY_ICONS = { 'Attack':'⚔','Shield Bash':'O','Fireball':'*','Heal':'+','Arrow Shot':'~','Dark Wave':')','Wait':'z' };
+
+  function draw(ctx, cw, ch, ts){
+    const unit = getUnit(GameState.actionMenuUnit); if(!unit)return;
+    const abilities = AbilitySystem.getAbilities(unit);
+    _btns = [];
+
+    // Tile-relative font sizing — clamp for small screens
+    const fs = Math.max(9, Math.min(Math.floor(ts * 0.165), Math.floor(cw * 0.028)));
+    const btnH = Math.max(BTN_MIN_H, Math.floor(ts * 0.62));
+    const pad = 10;
+    const menuW = Math.min(cw * 0.58, 220, Math.max(160, ts * 3.4));
+    const headerH = fs + 10;
+    const totalH = abilities.length * btnH + pad * 2 + headerH;
+
+    let mx = unit.x * ts + ts * 1.05;
+    if(mx + menuW > cw - 4) mx = unit.x * ts - menuW - ts * 0.05;
+    mx = Math.max(2, Math.min(cw - menuW - 2, mx));
+    let my = unit.y * ts - totalH * 0.28;
+    my = Math.max(2, Math.min(ch - totalH - 2, my));
+
+    ctx.save();
+
+    // Menu background
+    ctx.fillStyle = 'rgba(4,9,18,0.97)';
+    ctx.strokeStyle = CONFIG.COLORS.ACCENT;
+    ctx.lineWidth = 1.5;
+    _roundRect(ctx, mx, my, menuW, totalH, 7);
+    ctx.fill(); ctx.stroke();
+
+    // Inner glow border
+    ctx.strokeStyle = 'rgba(0,200,255,0.1)';
+    ctx.lineWidth = 3;
+    _roundRect(ctx, mx+2, my+2, menuW-4, totalH-4, 5);
+    ctx.stroke();
+
+    // Header
+    ctx.font = `bold ${fs}px 'Courier New',monospace`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillStyle = CONFIG.COLORS.GOLD;
+    ctx.fillText(`${unit.name}`, mx + pad, my + pad);
+
+    // MP display
+    const mpFs = Math.max(8, Math.floor(fs * 0.82));
+    ctx.font = `${mpFs}px 'Courier New',monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = CONFIG.COLORS.MP_BAR_FILL;
+    ctx.fillText(`MP ${unit.mp}/${unit.maxMp}`, mx + menuW - pad, my + pad + (fs - mpFs) * 0.5);
+
+    // Divider
+    ctx.strokeStyle = 'rgba(0,229,255,0.14)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mx + pad, my + pad + headerH - 2);
+    ctx.lineTo(mx + menuW - pad, my + pad + headerH - 2);
+    ctx.stroke();
+
+    // Ability buttons
+    abilities.forEach((ab, i) => {
+      const bx = mx + pad, by = my + pad + headerH + i * btnH, bw = menuW - pad * 2, bh = btnH - 4;
+      const ok = AbilitySystem.canUse(unit, ab.id);
+
+      // Check hover state
+      const mp = InputManager.getMousePos();
+      const isHovered = ok && mp.x >= bx && mp.x <= bx+bw && mp.y >= by && mp.y <= by+bh;
+
+      ctx.fillStyle = ok
+        ? (isHovered
+            ? (ab.id==='Wait' ? 'rgba(55,70,85,0.92)' : 'rgba(0,75,105,0.97)')
+            : (ab.id==='Wait' ? 'rgba(30,40,52,0.75)' : 'rgba(0,45,65,0.88)'))
+        : 'rgba(12,15,22,0.75)';
+      _roundRect(ctx, bx, by, bw, bh, 4); ctx.fill();
+
+      // Hover: add bright inner fill layer
+      if(isHovered){
+        ctx.save();
+        ctx.globalAlpha=0.08;
+        ctx.fillStyle='#ffffff';
+        _roundRect(ctx, bx, by, bw, bh, 4); ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.strokeStyle = ok
+        ? (isHovered
+            ? (ab.id==='Wait' ? 'rgba(130,160,180,0.7)' : '#00e5ff')
+            : (ab.id==='Wait' ? 'rgba(90,110,130,0.45)' : CONFIG.COLORS.ACCENT))
+        : 'rgba(40,55,70,0.3)';
+      ctx.lineWidth = (ok && ab.id !== 'Wait') ? (isHovered ? 1.8 : 1) : 0.5;
+      _roundRect(ctx, bx, by, bw, bh, 4); ctx.stroke();
+
+      // Ability name
+      ctx.font = `${ok ? 'bold ' : ''}${fs}px 'Courier New',monospace`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = ok ? (ab.id==='Wait' ? CONFIG.COLORS.TEXT_DIM : CONFIG.COLORS.TEXT_LIGHT) : 'rgba(70,90,110,0.55)';
+      ctx.fillText(`${ABILITY_ICONS[ab.id]||'?'} ${ab.name}`, bx + 10, by + bh / 2);
+
+      // MP cost badge
+      if(ab.mpCost > 0){
+        const mpBadgeFs = Math.max(7, Math.floor(fs * 0.78));
+        ctx.font = `${mpBadgeFs}px 'Courier New',monospace`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = ok ? '#6090ff' : 'rgba(40,60,130,0.5)';
+        ctx.fillText(`${ab.mpCost}MP`, bx + bw - 6, by + bh / 2);
+      }
+
+      _btns.push({ x:bx, y:by, w:bw, h:bh, abilityId:ab.id, canUse:ok });
+    });
+
+    ctx.restore();
+  }
+
+  function hitTest(cx,cy){
+    for(let i=0;i<_btns.length;i++){
+      const b=_btns[i];
+      if(cx>=b.x&&cx<=b.x+b.w&&cy>=b.y&&cy<=b.y+b.h) return i;
+    }
+    return null;
+  }
+
+  function handleSelection(idx){
+    const btn=_btns[idx]; if(!btn||!btn.canUse)return;
+    const unit=getUnit(GameState.actionMenuUnit); if(!unit)return;
+    if(btn.abilityId==='Wait'){
+      GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      TurnSystem.endTurn(); return;
+    }
+    const targets=AbilitySystem.getValidTargets(unit,btn.abilityId);
+    if(targets.length===0){
+      GameState.floatingTexts.push({x:unit.x,y:unit.y,text:'NO TARGET',color:'#ff9900',age:0,maxAge:30});
+      Renderer.draw(); return;
+    }
+    GameState.showActionMenu=false;
+    GameState.pendingAbility=btn.abilityId;
+    GameState.validTargetTiles=targets;
+    Renderer.draw();
+  }
+
+  return { draw, hitTest, handleSelection };
+})();
+
+// =============================================================================
+// --- SECTION: AI System ---
+// (Unchanged from original — do not modify)
+// =============================================================================
+const AISystem = (() => {
+
+  function _manhattan(ax, ay, bx, by) {
+    return Math.abs(ax - bx) + Math.abs(ay - by);
+  }
+
+  function _chebyshev(ax, ay, bx, by) {
+    return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+  }
+
+  function _selectTarget(unit) {
+    const players = GameState.units.filter(u => u.team === 'player' && u.hp > 0);
+    if (!players.length) return null;
+    players.sort((a, b) => {
+      if (a.hp !== b.hp) return a.hp - b.hp;
+      return _manhattan(unit.x, unit.y, a.x, a.y)
+           - _manhattan(unit.x, unit.y, b.x, b.y);
+    });
+    return players[0];
+  }
+
+  function _selectAbility(unit, target) {
+    const profile = AGGRESSION_PROFILES[unit.job] || {};
+    const preferred = profile.abilityPriority || [];
+    const rest = (unit.abilities || []).filter(
+      id => id !== 'Wait' && id !== 'Attack' && !preferred.includes(id)
+    );
+    const ordered = [...preferred, ...rest, 'Attack'];
+
+    for (const id of ordered) {
+      if (!(unit.abilities || []).includes(id)) continue;
+      const ab = ABILITIES[id];
+      if (!ab || ab.type === 'wait') continue;
+      if (!AbilitySystem.canUse(unit, id)) continue;
+      if (!ab.aoe) {
+        const dist = _chebyshev(unit.x, unit.y, target.x, target.y);
+        if (dist < 1 || dist > ab.range) continue;
+      } else {
+        const targets = AbilitySystem.getValidTargets(unit, id);
+        if (!targets.length) continue;
+      }
+      return id;
+    }
+    return null;
+  }
+
+  function _bestAoETarget(unit, abilityId, target) {
+    const ab = ABILITIES[abilityId];
+    if (!ab || !ab.aoe || !ab.aoeTiles) return { x: target.x, y: target.y };
+
+    const candidates = AbilitySystem.getValidTargets(unit, abilityId);
+    let bestTile = { x: target.x, y: target.y };
+    let bestScore = -Infinity;
+
+    for (const tile of candidates) {
+      const splash = ab.aoeTiles(tile.x, tile.y, unit);
+      let score = 0;
+      for (const st of splash) {
+        const u = getUnitAt(st.x, st.y);
+        if (!u) continue;
+        score += (u.team !== unit.team) ? 2 : -5;
+      }
+      score += Math.max(0, 3 - _manhattan(tile.x, tile.y, target.x, target.y));
+      if (score > bestScore) { bestScore = score; bestTile = tile; }
+    }
+    return bestTile;
+  }
+
+  function _moveToward(unit, targetX, targetY) {
+    const reach = MovementSystem.getReachableTiles(unit);
+    if (!reach.length) return false;
+
+    let options = reach.filter(t => !(t.x === targetX && t.y === targetY));
+    if (!options.length) options = reach;
+
+    options.sort((a, b) =>
+      _manhattan(a.x, a.y, targetX, targetY) -
+      _manhattan(b.x, b.y, targetX, targetY)
+    );
+    return _applyMove(unit, options[0]);
+  }
+
+  function _moveAwayFrom(unit, fromX, fromY) {
+    const reach = MovementSystem.getReachableTiles(unit);
+    if (!reach.length) return false;
+    reach.sort((a, b) =>
+      _manhattan(b.x, b.y, fromX, fromY) -
+      _manhattan(a.x, a.y, fromX, fromY)
+    );
+    return _applyMove(unit, reach[0]);
+  }
+
+  function _moveToIdealRange(unit, targetX, targetY, idealRange) {
+    const reach = MovementSystem.getReachableTiles(unit);
+    if (!reach.length) return false;
+
+    reach.sort((a, b) => {
+      const da = Math.abs(_manhattan(a.x, a.y, targetX, targetY) - idealRange);
+      const db = Math.abs(_manhattan(b.x, b.y, targetX, targetY) - idealRange);
+      return da - db;
+    });
+    return _applyMove(unit, reach[0]);
+  }
+
+  function _applyMove(unit, tile) {
+    if (!tile) return false;
+    GameState.map[unit.y][unit.x].occupied = false;
+    unit.x = tile.x; unit.y = tile.y;
+    GameState.map[tile.y][tile.x].occupied = true;
+    GameState.unitMoved = true;
+    GameEvents.emit('unit:moved', { unit, toX: tile.x, toY: tile.y });
+    Renderer.draw();
+    return true;
+  }
+
+  function _flash(unit, text, color) {
+    GameState.floatingTexts.push({ x: unit.x, y: unit.y, text, color, age: 0, maxAge: 30 });
+  }
+
+  const AGGRESSION_PROFILES = {
+    'Knight':      { abilityPriority: ['Shield Bash', 'Attack'], attackOnlyIfAdjacent: true },
+    'Mage':        { abilityPriority: ['Fireball', 'Attack'], retreatIfAdjacent: true },
+    'Archer':      { abilityPriority: ['Arrow Shot', 'Attack'], idealRange: 2 },
+    'Dark Knight': { abilityPriority: ['Dark Wave', 'Attack'], alwaysChase: true },
+    'Healer':      { abilityPriority: ['Revive', 'Mend', 'Attack'], preferHealAllies: true },
+    'Thief':       { abilityPriority: ['Steal Mana', 'Smoke Bomb', 'Attack'], targetHighestMp: true },
+    'Paladin':     { abilityPriority: ['Barrier', 'Holy Lance', 'Attack'], preferBarrierAllies: true },
+    'Berserker':   { abilityPriority: ['Rampage', 'Attack'], alwaysChase: true },
+  };
+
+  function _turnKnight(unit, target) {
+    const dist = _chebyshev(unit.x, unit.y, target.x, target.y);
+    if (dist === 1) { _attackPhase(unit, target, 0); return; }
+    _moveToward(unit, target.x, target.y);
+    setTimeout(() => {
+      const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+      const t = getUnit(target.id);
+      const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+      if (!realTarget) { TurnSystem.endTurn(); return; }
+      const newDist = _chebyshev(u.x, u.y, realTarget.x, realTarget.y);
+      if (newDist === 1) { _attackPhase(u, realTarget, 0); }
+      else { _flash(u, 'GUARD', '#4fc3f7'); Renderer.draw(); setTimeout(() => TurnSystem.endTurn(), 350); }
+    }, 480);
+  }
+
+  function _turnMage(unit, target) {
+    const players = GameState.units.filter(u => u.team === 'player' && u.hp > 0);
+    const threat = players.find(p => _chebyshev(unit.x, unit.y, p.x, p.y) === 1);
+    if (threat) {
+      _moveAwayFrom(unit, threat.x, threat.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 500);
+      return;
+    }
+    const abilityId = _selectAbility(unit, target);
+    if (abilityId) { _attackPhase(unit, target, 0); }
+    else {
+      _moveToward(unit, target.x, target.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 480);
+    }
+  }
+
+  function _turnArcher(unit, target) {
+    const profile = AGGRESSION_PROFILES['Archer'];
+    const ideal = profile.idealRange;
+    const dist = _manhattan(unit.x, unit.y, target.x, target.y);
+    const alreadyInRange = !!_selectAbility(unit, target);
+    if (dist === ideal && alreadyInRange) { _attackPhase(unit, target, 0); return; }
+    _moveToIdealRange(unit, target.x, target.y, ideal);
+    setTimeout(() => {
+      const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+      const t = getUnit(target.id);
+      const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+      if (!realTarget) { TurnSystem.endTurn(); return; }
+      _attackPhase(u, realTarget, 0);
+    }, 480);
+  }
+
+  function _turnDarkKnight(unit, target) {
+    const abilityId = _selectAbility(unit, target);
+    if (!abilityId) {
+      _moveToward(unit, target.x, target.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 480);
+      return;
+    }
+    const ab = ABILITIES[abilityId];
+    const wantToClose = ab && !ab.aoe && _chebyshev(unit.x, unit.y, target.x, target.y) > 1;
+    if (wantToClose) {
+      _moveToward(unit, target.x, target.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 480);
+    } else { _attackPhase(unit, target, 0); }
+  }
+
+  function _turnDefault(unit, target) {
+    const abilityId = _selectAbility(unit, target);
+    if (abilityId) { _attackPhase(unit, target, 0); }
+    else {
+      _moveToward(unit, target.x, target.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 480);
+    }
+  }
+
+  function _attackPhase(unit, target, extraDelay) {
+    setTimeout(() => {
+      const u = getUnit(unit.id);
+      if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+      const t = getUnit(target.id);
+      const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+      if (!realTarget) { TurnSystem.endTurn(); return; }
+      const abilityId = _selectAbility(u, realTarget);
+      if (!abilityId) {
+        _flash(u, 'WAIT', '#607080');
+        Renderer.draw();
+        setTimeout(() => TurnSystem.endTurn(), 300);
+        return;
+      }
+      const ab = ABILITIES[abilityId];
+      let tx = realTarget.x, ty = realTarget.y;
+      if (ab && ab.aoe && ab.aoeTiles) {
+        const best = _bestAoETarget(u, abilityId, realTarget);
+        tx = best.x; ty = best.y;
+      }
+      console.log(`%c[AI:${u.job}] ${u.name} → ${abilityId} @ (${tx},${ty})`,'color:#ef9a9a;font-style:italic');
+      AbilitySystem.execute(u, abilityId, tx, ty);
+    }, 350 + extraDelay);
+  }
+
+  function _turnBerserker(unit, target) {
+    // Always charge nearest enemy, use Rampage if any enemy adjacent
+    const enemies = GameState.units.filter(u => u.team !== unit.team && u.hp > 0);
+    const adjacent = enemies.filter(e => _chebyshev(unit.x, unit.y, e.x, e.y) === 1);
+    if (adjacent.length > 0) {
+      // Use Rampage centered on self (aoeTiles uses caster pos, target pos ignored)
+      _attackPhase(unit, adjacent[0], 0);
+    } else {
+      _moveToward(unit, target.x, target.y);
+      setTimeout(() => {
+        const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+        const t = getUnit(target.id);
+        const realTarget = (t && t.hp > 0) ? t : _selectTarget(u);
+        if (!realTarget) { TurnSystem.endTurn(); return; }
+        _attackPhase(u, realTarget, 0);
+      }, 480);
+    }
+  }
+
+  function _turnHealer(unit, target) {
+    // Prioritise healing lowest-HP ally, then attack
+    const allies = GameState.units.filter(u => u.team === unit.team && u.hp > 0 && u.id !== unit.id);
+    const wounded = allies.filter(a => a.hp < a.maxHp * 0.6)
+      .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+    // Try Revive first on fallen allies
+    const fallen = GameState.units.filter(u => u.team === unit.team && u.hp === 0);
+    for (const f of fallen) {
+      if (_chebyshev(unit.x, unit.y, f.x, f.y) <= 1 && AbilitySystem.canUse(unit, 'Revive')) {
+        setTimeout(() => AbilitySystem.execute(unit, 'Revive', f.x, f.y), 350);
+        return;
+      }
+    }
+    // Try Mend on wounded ally in range
+    for (const w of wounded) {
+      if (_chebyshev(unit.x, unit.y, w.x, w.y) <= 2 && AbilitySystem.canUse(unit, 'Mend')) {
+        setTimeout(() => AbilitySystem.execute(unit, 'Mend', w.x, w.y), 350);
+        return;
+      }
+    }
+    // Move toward most wounded ally if out of range
+    if (wounded.length > 0) {
+      const moveTarget = wounded[0];
+      const dist = _chebyshev(unit.x, unit.y, moveTarget.x, moveTarget.y);
+      if (dist > 2) {
+        _moveToward(unit, moveTarget.x, moveTarget.y);
+        setTimeout(() => {
+          const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+          // Re-check after move
+          const stillWounded = GameState.units.filter(a => a.team === u.team && a.hp > 0 && a.id !== u.id && a.hp < a.maxHp * 0.6)
+            .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+          if (stillWounded.length > 0 && _chebyshev(u.x, u.y, stillWounded[0].x, stillWounded[0].y) <= 2 && AbilitySystem.canUse(u, 'Mend')) {
+            setTimeout(() => AbilitySystem.execute(u, 'Mend', stillWounded[0].x, stillWounded[0].y), 200);
+          } else {
+            setTimeout(() => TurnSystem.endTurn(), 300);
+          }
+        }, 480);
+        return;
+      }
+    }
+    // No healing needed — fallback to weak attack or wait
+    const abilityId = _selectAbility(unit, target);
+    if (abilityId && abilityId !== 'Mend' && abilityId !== 'Revive') {
+      _attackPhase(unit, target, 0);
+    } else {
+      setTimeout(() => TurnSystem.endTurn(), 300);
+    }
+  }
+
+  function doTurn(unit) {
+    if (GameState.phase !== 'battle') return;
+    const u = getUnit(unit.id);
+    if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
+    const target = _selectTarget(u);
+    if (!target) { TurnSystem.endTurn(); return; }
+    console.log(`%c[AI:${u.job}] ${u.name} activates — targeting ${target.name} (HP ${target.hp})`,'color:#ef9a9a;font-weight:bold');
+    GameState.selectedUnit = u.id;
+    Renderer.draw();
+    switch (u.job) {
+      case 'Knight':      _turnKnight(u, target);     break;
+      case 'Mage':        _turnMage(u, target);        break;
+      case 'Archer':      _turnArcher(u, target);      break;
+      case 'Dark Knight': _turnDarkKnight(u, target);  break;
+      case 'Berserker':   _turnBerserker(u, target);   break;
+      case 'Healer':      _turnHealer(u, target);      break;
+      default:            _turnDefault(u, target);      break;
+    }
+  }
+
+  return { doTurn, _selectTarget, _selectAbility, AGGRESSION_PROFILES };
+})();
+
+</script>
+<!-- ============================================================
+     NARRATIVE LAYER: Title, Cutscenes, Audio, Save/Load
+     ============================================================ -->
+
+<!-- ── Title Screen HTML ───────────────────────────────────── -->
+<div id="title-screen" style="
+  position:fixed;inset:0;z-index:300;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #041020 0%, #020810 60%, #000 100%);
+  overflow:hidden;
+">
+  <!-- Star field -->
+  <canvas id="title-stars" style="position:absolute;inset:0;pointer-events:none;opacity:0.7;"></canvas>
+
+  <!-- Glitch title block -->
+  <div id="title-content" style="position:relative;z-index:2;text-align:center;padding:20px;">
+    <div id="title-eyebrow" style="
+      font-family:'Courier New',monospace;
+      font-size:clamp(9px,2vw,13px);
+      letter-spacing:0.55em;
+      color:var(--accent);
+      text-transform:uppercase;
+      opacity:0.7;
+      margin-bottom:10px;
+    ">◈ Chronicle I ◈</div>
+
+    <div id="title-main" style="
+      font-family:'Courier New',monospace;
+      font-size:clamp(32px,9vw,88px);
+      font-weight:900;
+      letter-spacing:0.04em;
+      line-height:1;
+      color:#fff;
+      text-shadow:0 0 60px rgba(0,229,255,0.5), 0 0 120px rgba(0,229,255,0.2);
+      margin-bottom:6px;
+      position:relative;
+    ">
+      <span style="color:var(--accent)">AETHER</span><span style="color:var(--gold)">MOOR</span>
+      <!-- Glitch layers -->
+      <span class="glitch-layer" style="position:absolute;inset:0;color:var(--accent);opacity:0;mix-blend-mode:screen;" aria-hidden="true">AETHERMOOR</span>
+      <span class="glitch-layer2" style="position:absolute;inset:0;color:#ff2060;opacity:0;mix-blend-mode:screen;" aria-hidden="true">AETHERMOOR</span>
+    </div>
+
+    <div style="
+      font-family:'Courier New',monospace;
+      font-size:clamp(9px,2vw,12px);
+      letter-spacing:0.28em;
+      color:var(--text-dim);
+      text-transform:uppercase;
+      margin-bottom:40px;
+    ">Tactical Chronicles</div>
+
+    <div style="
+      font-family:'Courier New',monospace;
+      font-size:clamp(10px,2.2vw,13px);
+      letter-spacing:0.12em;
+      color:var(--text);
+      line-height:1.6;
+      max-width:340px;
+      margin:0 auto 40px;
+      opacity:0.7;
+      font-style:italic;
+    ">"The ruin remembers those<br>who fought within its bones."</div>
+
+    <!-- Button group -->
+    <div id="title-btns" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <button id="btn-begin" onclick="NarrativeController.begin()" style="
+        font-family:'Courier New',monospace;
+        font-size:clamp(11px,2.5vw,15px);
+        letter-spacing:0.22em;
+        color:#000;
+        background:var(--accent);
+        border:none;
+        padding:13px 40px;
+        min-height:48px;
+        cursor:pointer;
+        text-transform:uppercase;
+        clip-path:polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+        transition:background 0.15s,transform 0.1s;
+        font-weight:bold;
+      ">► NEW GAME</button>
+
+      <button id="btn-continue" onclick="NarrativeController.continueGame()" style="
+        display:none;
+        font-family:'Courier New',monospace;
+        font-size:clamp(10px,2.2vw,13px);
+        letter-spacing:0.18em;
+        color:var(--gold);
+        background:transparent;
+        border:1px solid var(--gold);
+        padding:10px 32px;
+        min-height:44px;
+        cursor:pointer;
+        text-transform:uppercase;
+        transition:background 0.15s,color 0.15s;
+      ">► CONTINUE</button>
+    </div>
+
+    <!-- Save slot info -->
+    <div id="title-save-info" style="
+      display:none;
+      margin-top:12px;
+      font-family:'Courier New',monospace;
+      font-size:clamp(8px,1.8vw,10px);
+      color:var(--text-dim);
+      letter-spacing:0.1em;
+    "></div>
+  </div>
+
+  <!-- Bottom attribution -->
+  <div style="
+    position:absolute;bottom:16px;left:0;right:0;
+    text-align:center;
+    font-family:'Courier New',monospace;
+    font-size:clamp(7px,1.5vw,9px);
+    letter-spacing:0.2em;
+    color:rgba(74,96,112,0.5);
+    text-transform:uppercase;
+  ">◈ Browser Demo — Vanilla JS Engine ◈</div>
+</div>
+
+<!-- ── Cutscene Overlay HTML ────────────────────────────────── -->
+<div id="cutscene-overlay" style="
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:rgba(2,6,14,0.97);
+  flex-direction:column;align-items:center;justify-content:flex-end;
+  padding:0 0 clamp(20px,5vh,50px);
+  cursor:pointer;
+  user-select:none;
+">
+  <!-- BG tint layer -->
+  <div id="cs-bg-tint" style="position:absolute;inset:0;pointer-events:none;transition:background 0.6s;"></div>
+
+  <!-- Scene atmosphere (top area) -->
+  <div id="cs-scene-art" style="
+    position:absolute;top:0;left:0;right:0;
+    height:45%;
+    display:flex;align-items:center;justify-content:center;
+    pointer-events:none;
+  ">
+    <div id="cs-scene-glyph" style="
+      font-size:clamp(60px,18vw,140px);
+      opacity:0.07;
+      filter:blur(2px);
+      transition:opacity 0.8s;
+      font-family:serif;
+    "></div>
+  </div>
+
+  <!-- Dialogue box -->
+  <div id="cs-dialogue-box" style="
+    position:relative;z-index:2;
+    width:min(700px,92vw);
+    background:linear-gradient(135deg, rgba(4,10,22,0.98) 0%, rgba(6,16,30,0.96) 100%);
+    border:1px solid rgba(0,229,255,0.25);
+    box-shadow:0 0 40px rgba(0,229,255,0.08), inset 0 0 20px rgba(0,0,0,0.5);
+    padding:0;
+    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  ">
+    <!-- Corner accent -->
+    <div style="position:absolute;top:0;right:0;width:16px;height:16px;background:var(--accent);opacity:0.6;clip-path:polygon(0 0, 100% 100%, 100% 0);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:0;left:0;width:16px;height:16px;background:var(--accent);opacity:0.3;clip-path:polygon(0 0, 0 100%, 100% 100%);pointer-events:none;"></div>
+
+    <!-- Speaker row -->
+    <div id="cs-speaker-row" style="display:flex;align-items:stretch;gap:0;">
+      <!-- Portrait -->
+      <div id="cs-portrait" style="
+        width:clamp(64px,14vw,90px);
+        min-height:clamp(64px,14vw,90px);
+        display:flex;align-items:center;justify-content:center;
+        background:linear-gradient(135deg,rgba(0,50,80,0.9),rgba(0,20,40,0.95));
+        border-right:1px solid rgba(0,229,255,0.2);
+        font-size:clamp(24px,6vw,42px);
+        flex-shrink:0;
+        position:relative;
+        overflow:hidden;
+      ">
+        <span id="cs-portrait-char" style="position:relative;z-index:1;filter:drop-shadow(0 0 8px currentColor);"></span>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,229,255,0.04) 3px,rgba(0,229,255,0.04) 4px);pointer-events:none;"></div>
+      </div>
+      <!-- Name + scene counter -->
+      <div style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(0,229,255,0.12);">
+        <div id="cs-speaker-name" style="
+          font-family:'Courier New',monospace;
+          font-size:clamp(11px,2.8vw,16px);
+          font-weight:bold;
+          letter-spacing:0.18em;
+          color:var(--gold);
+          text-transform:uppercase;
+        "></div>
+        <div id="cs-scene-counter" style="
+          font-family:'Courier New',monospace;
+          font-size:clamp(8px,1.8vw,10px);
+          color:var(--text-dim);
+          letter-spacing:0.12em;
+        "></div>
+      </div>
+    </div>
+
+    <!-- Text area -->
+    <div style="padding:clamp(12px,3vw,20px) clamp(14px,3vw,22px);">
+      <div id="cs-text" style="
+        font-family:'Courier New',monospace;
+        font-size:clamp(11px,2.5vw,14px);
+        line-height:1.75;
+        color:var(--text);
+        min-height:clamp(52px,8vh,80px);
+        letter-spacing:0.04em;
+      "></div>
+      <!-- Advance prompt -->
+      <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:10px;gap:8px;">
+        <div id="cs-advance-hint" style="
+          font-family:'Courier New',monospace;
+          font-size:clamp(8px,1.8vw,10px);
+          color:var(--text-dim);
+          letter-spacing:0.12em;
+          animation:cs-blink 1.1s step-end infinite;
+          display:none;
+        ">TAP TO CONTINUE ▸</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Save notification ─────────────────────────────────────── -->
+<div id="save-toast" style="
+  display:none;
+  position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+  z-index:500;
+  font-family:'Courier New',monospace;
+  font-size:clamp(9px,2vw,11px);
+  letter-spacing:0.2em;
+  color:var(--accent);
+  background:rgba(4,10,22,0.95);
+  border:1px solid rgba(0,229,255,0.3);
+  padding:6px 16px;
+  text-transform:uppercase;
+  pointer-events:none;
+  animation:cs-blink 1s ease-in-out 3;
+">◈ SAVED ◈</div>
+
+<style>
+@keyframes cs-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes cs-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+@keyframes title-glitch {
+  0%,90%,100%{opacity:0;transform:none}
+  92%{opacity:0.7;transform:translate(-3px,1px) skewX(-2deg)}
+  94%{opacity:0;transform:none}
+  96%{opacity:0.4;transform:translate(4px,-2px)}
+  98%{opacity:0;}
+}
+@keyframes title-glitch2 {
+  0%,93%,100%{opacity:0;transform:none}
+  95%{opacity:0.5;transform:translate(5px,0)}
+  97%{opacity:0;transform:translate(-2px,3px)}
+  99%{opacity:0.3;transform:none}
+}
+.glitch-layer { animation: title-glitch 6s infinite; }
+.glitch-layer2 { animation: title-glitch2 6s infinite; }
+#btn-begin:hover { background:#33eeff !important; transform:scale(1.04); }
+#btn-continue:hover { background:rgba(255,215,64,0.1) !important; }
+</style>
+
+<script>
+// =============================================================================
+// --- SECTION: Sound System ---
+// Web Audio API procedural sound generation. No files, no libraries.
+// =============================================================================
+const SoundSystem = (() => {
+  let _ctx = null;
+  let _droneOsc = null, _droneGain = null;
+  let _initialized = false;
+
+  function _init() {
+    if (_initialized) return;
+    try {
+      _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      _initialized = true;
+    } catch(e) { console.warn('[SoundSystem] Web Audio not available'); }
+  }
+
+  function _tone(freq, startTime, dur, vol, type='sine', ctx=_ctx) {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+    osc.start(startTime);
+    osc.stop(startTime + dur + 0.05);
+  }
+
+  const SOUNDS = {
+    click() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      _tone(880, t, 0.06, 0.15, 'square');
+      _tone(440, t + 0.04, 0.08, 0.08, 'sine');
+    },
+    battleStart() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      // Rising fanfare: C4 E4 G4 C5
+      [[261,0],[329,0.18],[392,0.36],[523,0.54]].forEach(([f,d]) => {
+        _tone(f, t+d, 0.28, 0.18, 'sawtooth');
+        _tone(f*2, t+d, 0.18, 0.06, 'sine');
+      });
+    },
+    victory() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      // G4 A4 B4 D5 G5 — triumphant
+      [[392,0],[440,0.14],[493,0.28],[587,0.42],[784,0.58],[784,0.78]].forEach(([f,d]) => {
+        _tone(f, t+d, 0.22, 0.16, 'triangle');
+        _tone(f*1.5, t+d, 0.16, 0.05, 'sine');
+      });
+    },
+    defeat() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      // Descending minor: A4 F4 D4 A3
+      [[440,0],[349,0.22],[293,0.48],[220,0.80]].forEach(([f,d]) => {
+        _tone(f, t+d, 0.35, 0.14, 'sawtooth');
+      });
+    },
+    typeChar() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      const freq = 600 + Math.random() * 200;
+      _tone(freq, t, 0.03, 0.04, 'square');
+    },
+    advance() {
+      if (!_ctx) return;
+      const t = _ctx.currentTime;
+      _tone(660, t, 0.06, 0.08, 'sine');
+      _tone(880, t+0.05, 0.08, 0.06, 'sine');
+    },
+  };
+
+  function startDrone() {
+    if (!_ctx || _droneOsc) return;
+    _droneOsc = _ctx.createOscillator();
+    _droneGain = _ctx.createGain();
+    const filter = _ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 200;
+    filter.Q.value = 0.8;
+    _droneOsc.connect(filter);
+    filter.connect(_droneGain);
+    _droneGain.connect(_ctx.destination);
+    _droneOsc.type = 'sawtooth';
+    _droneOsc.frequency.value = 55; // A1
+    _droneGain.gain.setValueAtTime(0, _ctx.currentTime);
+    _droneGain.gain.linearRampToValueAtTime(0.04, _ctx.currentTime + 2);
+    _droneOsc.start();
+  }
+
+  function stopDrone() {
+    if (!_droneOsc || !_ctx) return;
+    _droneGain.gain.linearRampToValueAtTime(0, _ctx.currentTime + 1.5);
+    _droneOsc.stop(_ctx.currentTime + 1.6);
+    _droneOsc = null; _droneGain = null;
+  }
+
+  function play(soundId) {
+    if (!_initialized) return;
+    if (SOUNDS[soundId]) SOUNDS[soundId]();
+  }
+
+  function ensureInit() { _init(); }
+
+  return { play, ensureInit, startDrone, stopDrone };
+})();
+
+// =============================================================================
+// --- SECTION: Save System ---
+// localStorage-backed save with unit state, map, and round number.
+// =============================================================================
+const SaveSystem = (() => {
+  const KEY = 'aethermoor_save_v1';
+
+  function save() {
+    const data = {
+      mapId: GameState.currentMapId,
+      turnNumber: GameState.turnNumber,
+      units: GameState.units.map(u => ({
+        id: u.id, hp: u.hp, mp: u.mp,
+      })),
+      timestamp: Date.now(),
+    };
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+      _showToast();
+      console.log('[SaveSystem] Saved:', data);
+    } catch(e) { console.warn('[SaveSystem] Save failed:', e); }
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch(e) { return null; }
+  }
+
+  function clear() {
+    localStorage.removeItem(KEY);
+  }
+
+  function applyToState(saveData) {
+    if (!saveData) return;
+    // Restore HP/MP
+    for (const saved of saveData.units) {
+      const u = GameState.units.find(x => x.id === saved.id);
+      if (u) { u.hp = saved.hp; u.mp = saved.mp; }
+    }
+    GameState.turnNumber = saveData.turnNumber || 0;
+  }
+
+  function _showToast() {
+    const t = document.getElementById('save-toast');
+    if (!t) return;
+    t.style.display = 'block';
+    t.style.opacity = '1';
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => {
+      t.style.transition = 'opacity 0.5s';
+      t.style.opacity = '0';
+      setTimeout(() => { t.style.display = 'none'; t.style.transition = ''; }, 520);
+    }, 2000);
+  }
+
+  return { save, load, clear, applyToState };
+})();
+
+// =============================================================================
+// --- SECTION: Cutscene Engine ---
+// Plays a sequence of dialogue scenes as a full-screen overlay.
+// =============================================================================
+const CutsceneEngine = (() => {
+  let _scenes = [];
+  let _idx = 0;
+  let _onComplete = null;
+  let _typing = false;
+  let _typeTimer = null;
+  let _currentText = '';
+  let _charIdx = 0;
+
+  const overlay   = document.getElementById('cutscene-overlay');
+  const bgTint    = document.getElementById('cs-bg-tint');
+  const sceneGlyph= document.getElementById('cs-scene-glyph');
+  const portrait  = document.getElementById('cs-portrait-char');
+  const speakerEl = document.getElementById('cs-speaker-name');
+  const textEl    = document.getElementById('cs-text');
+  const counterEl = document.getElementById('cs-scene-counter');
+  const hintEl    = document.getElementById('cs-advance-hint');
+
+  function _showScene(idx) {
+    if (idx >= _scenes.length) { _end(); return; }
+    const s = _scenes[idx];
+    _charIdx = 0;
+    _currentText = s.text;
+
+    portrait.textContent    = s.portrait || '?';
+    portrait.style.color    = s.portraitColor || 'var(--accent)';
+    speakerEl.textContent   = s.speaker || '';
+    textEl.textContent      = '';
+    counterEl.textContent   = `${idx+1} / ${_scenes.length}`;
+    hintEl.style.display    = 'none';
+    bgTint.style.background = s.bgTint || 'transparent';
+    sceneGlyph.textContent  = s.glyph || '';
+
+    _typing = true;
+    _typeNext();
+  }
+
+  function _typeNext() {
+    if (_charIdx >= _currentText.length) {
+      _typing = false;
+      hintEl.style.display = 'block';
+      return;
+    }
+    textEl.textContent = _currentText.slice(0, _charIdx + 1);
+    // Sound every few chars
+    if (_charIdx % 3 === 0) SoundSystem.play('typeChar');
+    _charIdx++;
+    const delay = _currentText[_charIdx - 1] === '.' || _currentText[_charIdx - 1] === '!' ? 80 : 28;
+    _typeTimer = setTimeout(_typeNext, delay);
+  }
+
+  function _advance() {
+    if (_typing) {
+      // Skip typewriter
+      clearTimeout(_typeTimer);
+      textEl.textContent = _currentText;
+      _typing = false;
+      hintEl.style.display = 'block';
+      return;
+    }
+    SoundSystem.play('advance');
+    _idx++;
+    _showScene(_idx);
+  }
+
+  function _end() {
+    overlay.style.display = 'none';
+    GameState.phase = 'battle';
+    if (_onComplete) { const cb = _onComplete; _onComplete = null; cb(); }
+  }
+
+  function play(scenes, onComplete) {
+    _scenes = scenes;
+    _idx = 0;
+    _onComplete = onComplete;
+    GameState.phase = 'cutscene';
+    overlay.style.display = 'flex';
+
+    // Attach interaction once
+    overlay.onclick = () => _advance();
+    overlay.ontouchend = (e) => { e.preventDefault(); _advance(); };
+
+    _showScene(0);
+  }
+
+  return { play };
+})();
+
+// =============================================================================
+// --- SECTION: Story Script ---
+// All narrative content for the game's three acts.
+// =============================================================================
+const StoryScript = (() => {
+
+  const INTRO = [
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "Three days since Ashfen sealed the perimeter. They're not soldiers — they're contractors. Someone paid well to make sure no one reaches the vault below these stones."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "The ley-lines are active — more than they should be after four centuries of dormancy. Whatever the Founders entombed here has been waking up. I can feel it through the stone. We need to reach the vault before they do."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "Vault, power, destiny — fascinating. I'm more interested in whether we're getting paid when this is over. How many of them are between us and this door?"
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "Grunt's archers hold the outer courtyard. Darkwraith commands the inner gate. They're the vanguard — the real force is still further in. We cut through, we keep moving."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†',
+      portraitColor: '#80cbc4',
+      glyph: '†',
+      bgTint: 'rgba(0,25,40,0.5)',
+      text: "I've broken through Ashfen lines before. They fight hard but they fight for coin, not conviction. Hold the formation and they'll crack. Lose it and they won't need to."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "Right. Inspiring. Can we go now?"
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Ruins of Aethermoor. Neutralize all enemy forces. The gate to the causeway lies beyond."
+    },
+  ];
+
+  const MID = [
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "Grunt's dead. Darkwraith pulled back — wounded, not finished. They were the vanguard, Aldric. The main force is regrouping on the causeway."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "Of course they are. Nothing about this job has been straightforward. What's a causeway look like when someone's had three days to dig in?"
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†',
+      portraitColor: '#80cbc4',
+      glyph: '†',
+      bgTint: 'rgba(0,25,40,0.5)',
+      text: "Narrow ground, water on the flanks, high ridges covering both exits. If they've placed archers on the ledges we'll be walking into a kill zone. We move fast or we don't move at all."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "Then we don't give them time to breathe. The vault isn't going to wait for us to get comfortable. Push through. Stay close."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Ashfen Causeway. Breach the enemy line. The passage into the ruins lies ahead."
+    },
+  ];
+
+  const OUTRO = [
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,40,0.5)',
+      text: "The keep is ours. All of them — down. We need thirty seconds to breathe and then we find that vault door."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "Found it. But Aldric — this isn't a lock. These glyphs aren't mechanical. They're a warning, carved in seven different scripts over the top of each other. Someone came back to this door more than once to make sure you'd understand: do not open it."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.5)',
+      text: "The ley-lines aren't radiating from the vault — they're flowing into it. Something in there is pulling energy from the entire region. It's been doing it for centuries. And it's not dormant. It is consuming, and it has been waiting for exactly this door to open."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†',
+      portraitColor: '#80cbc4',
+      glyph: '†',
+      bgTint: 'rgba(0,25,40,0.5)',
+      text: "Then the real question is the one none of us want to say out loud. The Founders sealed this for a reason — better soldiers than us, with more knowledge than us, decided it had to stay closed. So do we open it?"
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "We came this far. I'd rather know what we're dealing with than spend the rest of my life wondering if someone else found it first."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.5)',
+      text: "We open it. That's what we came here for. Stand ready — all of you."
+    },
+    {
+      speaker: '— —',
+      portrait: '◈',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(10,0,30,0.9)',
+      text: "The vault door splits open. Light — old light, the wrong color — pours into the keep. No one speaks. Everyone takes one step back. Except Aldric, who takes one step forward."
+    },
+    {
+      speaker: '— ACT I COMPLETE —',
+      portrait: '◈',
+      portraitColor: 'var(--gold)',
+      glyph: '◈',
+      bgTint: 'rgba(0,0,0,0.92)',
+      text: "Aethermoor: Tactical Chronicles  ·  ·  ·  To Be Continued"
+    },
+  ];
+
+  const DEFEAT_SCENE = [
+    {
+      speaker: 'Brute',
+      portrait: '⚡',
+      portraitColor: '#ff6f00',
+      glyph: '⚡',
+      bgTint: 'rgba(40,10,0,0.7)',
+      text: "That's it? I've broken better than you before breakfast. Get up when you can — if you can."
+    },
+    {
+      speaker: 'Sister',
+      portrait: '✚',
+      portraitColor: '#ff80ab',
+      glyph: '✚',
+      bgTint: 'rgba(30,0,20,0.6)',
+      text: "Oh, don't be ashamed. You were overmatched from the moment you stepped into this field. I've seen it before — good fighters, wrong ground, wrong day. Rest now. I'll see to your wounds."
+    },
+    {
+      speaker: 'Darkwraith',
+      portrait: '☽',
+      portraitColor: '#9e47ff',
+      glyph: '☽',
+      bgTint: 'rgba(20,0,40,0.7)',
+      text: "You pushed far. Farther than most. But these grounds do not yield to the unprepared. Return when you are ready — if the dead will let you leave."
+    },
+  ];
+
+  // ── PRE_BATTLE_BANTER — short pre-fight exchanges, one per map (indices 0–3) ──
+  // Index 0: map_1, Index 1: map_2, Index 2: map_3, Index 3: map_4
+  // (wired into NarrativeController separately — content only here)
+  const PRE_BATTLE_BANTER = [
+    // Index 0 — map_1: Aldric and Zara
+    [
+      {
+        speaker: 'Zara',
+        portrait: '◈',
+        portraitColor: '#ffd740',
+        glyph: '◈',
+        bgTint: 'rgba(20,15,0,0.5)',
+        text: "Before we go in — if I find anything valuable in these ruins, that's mine. Pre-agreed. Just so we're clear."
+      },
+      {
+        speaker: 'Aldric',
+        portrait: '⚔',
+        portraitColor: '#4fc3f7',
+        glyph: '⚔',
+        bgTint: 'rgba(0,20,50,0.4)',
+        text: "Nothing in there belongs to us until the job is done. After that — I'll consider it. Move out."
+      },
+    ],
+    // Index 1 — map_2: Lyra and Kael
+    [
+      {
+        speaker: 'Lyra',
+        portrait: '✦',
+        portraitColor: '#b388ff',
+        glyph: '✦',
+        bgTint: 'rgba(20,0,50,0.4)',
+        text: "The resonance is stronger here. There's something in the causeway stone — trace enchantments, military-grade. The Founders built this road to last."
+      },
+      {
+        speaker: 'Kael',
+        portrait: '†',
+        portraitColor: '#80cbc4',
+        glyph: '†',
+        bgTint: 'rgba(0,25,40,0.5)',
+        text: "Good. Then the ground won't shift under us. Focus on what's in front — the road can wait until after."
+      },
+    ],
+    // Index 2 — map_3: Zara and Aldric
+    [
+      {
+        speaker: 'Zara',
+        portrait: '◈',
+        portraitColor: '#ffd740',
+        glyph: '◈',
+        bgTint: 'rgba(20,15,0,0.5)',
+        text: "Three walls, two chokepoints, one exit. You know who designs a passage like this? Someone who wanted it to be a slaughterhouse."
+      },
+      {
+        speaker: 'Aldric',
+        portrait: '⚔',
+        portraitColor: '#4fc3f7',
+        glyph: '⚔',
+        bgTint: 'rgba(0,20,50,0.4)',
+        text: "Then we don't give them time to use it that way. Pick a lane and commit — hesitation is what kills you here."
+      },
+    ],
+    // Index 3 — map_4: Kael and Lyra
+    [
+      {
+        speaker: 'Kael',
+        portrait: '†',
+        portraitColor: '#80cbc4',
+        glyph: '†',
+        bgTint: 'rgba(0,25,40,0.5)',
+        text: "Shallows like this eat heavy armor. I'll take point — if the ground gives way, I'll find out first."
+      },
+      {
+        speaker: 'Lyra',
+        portrait: '✦',
+        portraitColor: '#b388ff',
+        glyph: '✦',
+        bgTint: 'rgba(20,0,50,0.4)',
+        text: "Your dedication to suffering on our behalf is noted. Just don't drown — I'd rather not lose a paladin to a marsh."
+      },
+    ],
+  ];
+
+  // ── Transition: map_2 → map_3 ────────────────────────────────
+  const TRANSITION_2_3 = [
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "The causeway is ours. They're falling back into the passage — old iron walls, tight corridors. One wrong step and we're bottlenecked."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '✦',
+      portraitColor: '#80cbc4',
+      glyph: '†',
+      bgTint: 'rgba(0,25,40,0.5)',
+      text: "Let them think the walls protect them. I'll take the front. Just keep Lyra out of the chokepoints — she's no good to us cornered."
+    },
+  ];
+
+  // ── Transition: map_3 → map_4 ────────────────────────────────
+  const TRANSITION_3_4 = [
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(0,20,30,0.5)',
+      text: "Passage is clear. But smell that? Marsh water. The ground ahead is rotting — half of it's underwater and the rest isn't far behind."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "Stay on the high ground. The shallows will slow us — but they'll slow them too. Pick your crossings carefully."
+    },
+  ];
+
+  // ── Transition: map_4 → map_5 ────────────────────────────────
+  const TRANSITION_4_5 = [
+    {
+      speaker: 'Brute',
+      portrait: '⚡',
+      portraitColor: '#ef5350',
+      glyph: '⚡',
+      bgTint: 'rgba(40,10,0,0.6)',
+      text: "You made it through the shallows. Impressive. The escarpment ahead is ours — every ridge, every stone. Come up. We'll be waiting."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "He wants us rattled. Don't give him it. Uphill fights are won by patience — don't charge the ridge, flank it. Move."
+    },
+  ];
+
+  // ── Transition: map_5 → map_6 ────────────────────────────────
+  const TRANSITION_5_6 = [
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "The escarpment is behind us. One more door. The Shattered Keep — whatever the Founders locked inside, we're about to find out why they didn't want it opened."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "The ley-line pulse is coming from inside those walls. It's strong — stronger than anything natural. Something in the keep is already awake."
+    },
+  ];
+
+  // ── PRE_BATTLE_3 — Ironhold Passage ──────────────────────────
+  const PRE_BATTLE_3 = [
+    {
+      speaker: 'Kael',
+      portrait: '†',
+      portraitColor: '#80cbc4',
+      glyph: '†',
+      bgTint: 'rgba(0,25,40,0.5)',
+      text: "Iron walls, iron floors. The passage was built to funnel an army into a killing ground — three lanes, no room to maneuver. Once we commit to one, we can't pull back."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "Then we pick the right lane before we step in. Lyra — anything ahead? Zara — watch the walls. Ambush points in places like this are carved into the architecture."
+    },
+    {
+      speaker: 'Darkwraith',
+      portrait: '☽',
+      portraitColor: '#9e47ff',
+      glyph: '☽',
+      bgTint: 'rgba(20,0,40,0.7)',
+      text: "You hear it? The stone remembers every soldier who bled here. Take your time choosing your path — all three lanes lead to the same place. Me."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Ironhold Passage. Navigate the iron corridors. Neutralize all enemy forces."
+    },
+  ];
+
+  // ── PRE_BATTLE_4 — Thornmire Shallows ───────────────────────
+  const PRE_BATTLE_4 = [
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "Wonderful. Nothing I love more than ankle-deep water with a sword in my hand. Which crossing are we taking? Because I count four, and three of them look like traps."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "The water itself carries an old enchantment — weighting, slowing, draining. It's not recent. Someone in the Founder's age seeded the marsh to stop exactly what we're trying to do."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈',
+      portraitColor: '#ffd740',
+      glyph: '◈',
+      bgTint: 'rgba(20,15,0,0.5)',
+      text: "So the ground was rigged four hundred years ago specifically to kill us. Somehow that's not even the strangest thing that's happened this week."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Thornmire Shallows. Cross the marsh. Eliminate all enemy units. Avoid the deep water."
+    },
+  ];
+
+  // ── PRE_BATTLE_5 — Verdant Escarpment ───────────────────────
+  const PRE_BATTLE_5 = [
+    {
+      speaker: 'Brute',
+      portrait: '⚡',
+      portraitColor: '#ff6f00',
+      glyph: '⚡',
+      bgTint: 'rgba(40,10,0,0.6)',
+      text: "Come on then. Every ridge up here is mine — I've held this escarpment for two days waiting for someone worth fighting. Don't disappoint me."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.4)',
+      text: "He's not wrong — they have every high tile on the board. Attacking uphill into that is going to hurt. We need to force them off the ridge before we engage directly."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "We've been hurt before. High ground matters — it doesn't decide the fight. Stay tight, advance through the barriers, don't let them pick us apart in the open. We push together or not at all."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Verdant Escarpment. Assault the high ground. WARNING — enemy holds elevated advantage across the full front line."
+    },
+  ];
+
+  // ── PRE_BATTLE_6 — The Shattered Keep ───────────────────────
+  const PRE_BATTLE_6 = [
+    {
+      speaker: 'Lyra',
+      portrait: '✦',
+      portraitColor: '#b388ff',
+      glyph: '✦',
+      bgTint: 'rgba(20,0,50,0.5)',
+      text: "The ley-lines inside that keep are fracturing. I've never read anything like this — it's as if the vault is pushing back against the walls holding it. Whatever is in there knows we're coming."
+    },
+    {
+      speaker: 'Darkwraith',
+      portrait: '☽',
+      portraitColor: '#9e47ff',
+      glyph: '☽',
+      bgTint: 'rgba(20,0,40,0.8)',
+      text: "You've come further than I expected. But the keep is the last threshold, and I am the last guardian. I will not move aside for curiosity — or for coin."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔',
+      portraitColor: '#4fc3f7',
+      glyph: '⚔',
+      bgTint: 'rgba(0,20,50,0.4)',
+      text: "We didn't cross a causeway, a marsh, a passage, and an escarpment to stop at a gate. Every one of us chose to be here. Whatever's waiting on the other side — we face it the same way we faced everything else. Together."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈',
+      portraitColor: 'var(--accent)',
+      glyph: '◈',
+      bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: The Shattered Keep. Final engagement. Breach the inner fortress. End it."
+    },
+  ];
+
+  return { INTRO, MID, OUTRO, DEFEAT_SCENE, PRE_BATTLE_BANTER, PRE_BATTLE_3, PRE_BATTLE_4, PRE_BATTLE_5, PRE_BATTLE_6, TRANSITION_2_3, TRANSITION_3_4, TRANSITION_4_5, TRANSITION_5_6 };
+})();
+
+// =============================================================================
+// --- SECTION: Narrative Controller ---
+// Orchestrates the full game flow: title → cutscene → battle → cutscene → ...
+// =============================================================================
+const NarrativeController = (() => {
+  let _currentAct = 'map_1'; // 'map_1' through 'map_6'
+
+  function _hideTitleScreen() {
+    const ts = document.getElementById('title-screen');
+    if (!ts) return;
+    ts.style.transition = 'opacity 0.5s';
+    ts.style.opacity = '0';
+    setTimeout(() => { ts.style.display = 'none'; }, 520);
+  }
+
+  function _startBattle(mapId) {
+    // Load map and start battle
+    MapSystem.load(mapId);
+    _currentAct = mapId;
+
+    // Reset turn state
+    GameState.currentTurn = null;
+    GameState.turnQueue = [];
+    GameState.selectedUnit = null;
+    GameState.validMoveTiles = [];
+    GameState.unitMoved = false;
+    GameState.unitActed = false;
+    GameState.showActionMenu = false;
+    GameState.actionMenuUnit = null;
+    GameState.pendingAbility = null;
+    GameState.validTargetTiles = [];
+    GameState.floatingTexts = [];
+    GameState.turnNumber = 0;
+    GameState.phase = 'battle';
+
+    const canvas = document.getElementById('game-canvas');
+    const ts = Renderer.init(canvas);
+    InputManager.setCanvas(canvas, ts);
+
+    WaterAnim.check();
+    SoundSystem.startDrone();
+    SoundSystem.play('battleStart');
+
+    // Pre-battle scenes: banter for maps 1–4, new scenes for maps 5–6.
+    // Maps 3 and 4 chain banter → pre-battle scene before starting.
+    Renderer.draw();
+    const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
+    const _preBattleMap = { map_5: StoryScript.PRE_BATTLE_5, map_6: StoryScript.PRE_BATTLE_6 };
+    const _preBattle = _preBattleMap[mapId];
+    const _startTurn = () => { TurnSystem.start(); Renderer.draw(); };
+
+    if (mapId === 'map_3' || mapId === 'map_4') {
+      // Chain: existing banter → new pre-battle scene
+      const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
+      const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
+      CutsceneEngine.play(_banter, () => {
+        CutsceneEngine.play(_scene, _startTurn);
+      });
+    } else if (_banterIndex !== undefined && StoryScript.PRE_BATTLE_BANTER[_banterIndex]) {
+      // Maps 1 and 2 — banter only
+      CutsceneEngine.play(StoryScript.PRE_BATTLE_BANTER[_banterIndex], _startTurn);
+    } else if (_preBattle) {
+      // Maps 5 and 6 — new pre-battle only
+      CutsceneEngine.play(_preBattle, _startTurn);
+    } else {
+      _startTurn();
+    }
+
+    // Update map button
+    const btn = document.getElementById('map-select-btn');
+    if (btn && MAP_DEFINITIONS[mapId]) {
+      btn.textContent = `${MAP_DEFINITIONS[mapId].label.split(' ')[0].toUpperCase()} ▸`;
+    }
+
+    // Ensure resize handler is registered once
+    if (!window._resizeHandlerSet) {
+      window._resizeHandlerSet = true;
+      window.addEventListener('resize', () => {
+        const c = document.getElementById('game-canvas');
+        const ns = Renderer.init(c);
+        InputManager.setCanvas(c, ns);
+        WaterAnim.check();
+        Renderer.draw();
+      });
+    }
+
+    console.log(`%c[NarrativeController] Battle started: ${mapId}`, 'color:#00e5ff;font-weight:bold');
+  }
+
+  // ── Shared helper: stop drone, play victory, hide overlay, then cutscene → next ──
+  function _transition(cutsceneScenes, nextMapId) {
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(cutsceneScenes, () => {
+        _startBattle(nextMapId);
+      });
+    }, 1800);
+  }
+
+  function _onMap1Victory() {
+    // Save with next map so CONTINUE resumes at map_2
+    GameState.currentMapId = 'map_2';
+    SaveSystem.save();
+    _transition(StoryScript.MID, 'map_2');
+  }
+
+  function _onMap2Victory() {
+    GameState.currentMapId = 'map_3';
+    SaveSystem.save();
+    _transition(StoryScript.TRANSITION_2_3, 'map_3');
+  }
+
+  function _onMap3Victory() {
+    GameState.currentMapId = 'map_4';
+    SaveSystem.save();
+    _transition(StoryScript.TRANSITION_3_4, 'map_4');
+  }
+
+  function _onMap4Victory() {
+    GameState.currentMapId = 'map_5';
+    SaveSystem.save();
+    _transition(StoryScript.TRANSITION_4_5, 'map_5');
+  }
+
+  function _onMap5Victory() {
+    GameState.currentMapId = 'map_6';
+    SaveSystem.save();
+    _transition(StoryScript.TRANSITION_5_6, 'map_6');
+  }
+
+  function _onMap6Victory() {
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.OUTRO, () => {
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'THE END';
+        o.querySelector('#end-title').style.color = 'var(--gold)';
+        o.querySelector('#end-message').textContent = 'Chronicle I — Aethermoor complete.';
+        o.style.display = 'flex';
+        SaveSystem.clear();
+      });
+    }, 1800);
+  }
+
+  function _onDefeat() {
+    SoundSystem.stopDrone();
+    SoundSystem.play('defeat');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.DEFEAT_SCENE, () => {
+        // Show the defeat screen after cutscene
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'DEFEAT';
+        o.querySelector('#end-title').style.color = '#ef5350';
+        o.querySelector('#end-message').textContent = 'The ruins claim you.';
+        o.style.display = 'flex';
+      });
+    }, 800);
+  }
+
+  let _battleEventsRegistered = false;
+  function _registerBattleEvents() {
+    if (_battleEventsRegistered) return;
+    _battleEventsRegistered = true;
+    GameEvents.on('battle:win', () => {
+      const routes = {
+        map_1: _onMap1Victory,
+        map_2: _onMap2Victory,
+        map_3: _onMap3Victory,
+        map_4: _onMap4Victory,
+        map_5: _onMap5Victory,
+        map_6: _onMap6Victory,
+      };
+      const handler = routes[_currentAct];
+      if (handler) handler();
+    });
+    GameEvents.on('battle:loss', () => {
+      _onDefeat();
+    });
+  }
+
+  function begin() {
+    SoundSystem.ensureInit();
+    SoundSystem.play('click');
+    _hideTitleScreen();
+    setTimeout(() => {
+      // Initialize engine silently (without starting battle)
+      const canvas = document.getElementById('game-canvas');
+      MapSystem.load('map_1');
+      Renderer.init(canvas);
+      InputManager.attach(canvas, Renderer.getTileSize());
+
+      _registerBattleEvents();
+      // Register core listeners from main engine
+      registerCoreListeners();
+
+      // Play intro cutscene then start battle
+      CutsceneEngine.play(StoryScript.INTRO, () => {
+        _startBattle('map_1');
+      });
+    }, 600);
+  }
+
+  function continueGame() {
+    SoundSystem.ensureInit();
+    SoundSystem.play('click');
+    const saveData = SaveSystem.load();
+    if (!saveData) { begin(); return; }
+
+    _hideTitleScreen();
+    setTimeout(() => {
+      const canvas = document.getElementById('game-canvas');
+      MapSystem.load(saveData.mapId);
+      SaveSystem.applyToState(saveData);
+      Renderer.init(canvas);
+      InputManager.attach(canvas, Renderer.getTileSize());
+
+      _registerBattleEvents();
+      registerCoreListeners();
+
+      _currentAct = saveData.mapId;
+      _startBattle(saveData.mapId);
+    }, 600);
+  }
+
+  function initTitleScreen() {
+    const saveData = SaveSystem.load();
+    if (saveData) {
+      const btn = document.getElementById('btn-continue');
+      const info = document.getElementById('title-save-info');
+      if (btn) btn.style.display = 'block';
+      if (info) {
+        const mapLabel = MAP_DEFINITIONS[saveData.mapId] ? MAP_DEFINITIONS[saveData.mapId].label : saveData.mapId;
+        const date = new Date(saveData.timestamp).toLocaleDateString();
+        info.style.display = 'block';
+        info.textContent = `Save: ${mapLabel} · ${date}`;
+      }
+    }
+    _initTitleStars();
+    _initTitleAnimation();
+  }
+
+  function _initTitleStars() {
+    const c = document.getElementById('title-stars');
+    if (!c) return;
+    c.width = window.innerWidth; c.height = window.innerHeight;
+    const ctx = c.getContext('2d');
+    const stars = Array.from({length: 120}, () => ({
+      x: Math.random(), y: Math.random(),
+      r: Math.random() * 1.5 + 0.3,
+      a: Math.random(),
+      speed: Math.random() * 0.003 + 0.001,
+    }));
+    function draw() {
+      ctx.clearRect(0, 0, c.width, c.height);
+      stars.forEach(s => {
+        s.a = 0.2 + 0.6 * Math.abs(Math.sin(Date.now() * s.speed));
+        ctx.beginPath();
+        ctx.arc(s.x * c.width, s.y * c.height, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(180,220,255,${s.a.toFixed(2)})`;
+        ctx.fill();
+      });
+      // Horizontal scan line sweep
+      const sweep = (Date.now() / 3000) % 1;
+      const sg = ctx.createLinearGradient(0, sweep * c.height - 40, 0, sweep * c.height + 40);
+      sg.addColorStop(0, 'rgba(0,229,255,0)');
+      sg.addColorStop(0.5, 'rgba(0,229,255,0.04)');
+      sg.addColorStop(1, 'rgba(0,229,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(0, sweep * c.height - 40, c.width, 80);
+
+      if (document.getElementById('title-screen').style.display !== 'none') {
+        requestAnimationFrame(draw);
+      }
+    }
+    draw();
+    window.addEventListener('resize', () => {
+      c.width = window.innerWidth; c.height = window.innerHeight;
+    });
+  }
+
+  function _initTitleAnimation() {
+    // Animate title content in
+    const content = document.getElementById('title-content');
+    if (content) {
+      content.style.opacity = '0';
+      content.style.transform = 'translateY(20px)';
+      setTimeout(() => {
+        content.style.transition = 'opacity 1s ease, transform 1s ease';
+        content.style.opacity = '1';
+        content.style.transform = 'none';
+      }, 300);
+    }
+  }
+
+  return { begin, continueGame, initTitleScreen };
+})();
+
+// =============================================================================
+// --- SECTION: Init Override ---
+// Intercepts DOMContentLoaded to show title screen first.
+// The engine's init() is NOT called here — NarrativeController.begin() handles it.
+// =============================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize the title screen (does NOT start the engine yet)
+  NarrativeController.initTitleScreen();
+
+  // Handle first-tap audio context unlock
+  document.addEventListener('pointerdown', () => {
+    SoundSystem.ensureInit();
+  }, { once: true });
+});
+
+// Also expose on window for onclick handlers
+window.NarrativeController = NarrativeController;
+window.SaveSystem = SaveSystem;
+window.SoundSystem = SoundSystem;
+</script>
+</body>
+</html>
