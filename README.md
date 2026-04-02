@@ -4,7 +4,7 @@ Browser-based tactical RPG. Playable on Android Chrome.
 
 ## Play
 
-[Live link added after first deploy]
+[https://santipenko.github.io/aethermoor/]
 
 ## Development
 
