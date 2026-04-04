@@ -7,16 +7,16 @@ const MAP_DEFINITIONS = {
     high:     ['2,2','5,3','4,5','7,2'],
     water:    ['0,4','0,5','1,4'],
     playerStart: [
-      { id:'p1', x:1, y:5 },
-      { id:'p2', x:2, y:6 },
-      { id:'p3', x:0, y:6 },
-      { id:'p4', x:1, y:6 },
+      { id:'aldric', x:1, y:5 },
+      { id:'lyra',   x:2, y:6 },
+      { id:'kael',   x:0, y:6 },
+      { id:'zara',   x:1, y:6 },
     ],
     enemyStart: [
-      { id:'e1', x:5, y:2 },
-      { id:'e2', x:6, y:1 },
-      { id:'e3', x:4, y:1 },
-      { id:'e4', x:7, y:0 },
+      { id:'grunt',      x:5, y:2 },
+      { id:'darkwraith', x:6, y:1 },
+      { id:'brute',      x:4, y:1 },
+      { id:'sister',     x:7, y:0 },
     ],
   },
   map_2: {
@@ -27,16 +27,16 @@ const MAP_DEFINITIONS = {
     high:     ['0,0','1,0','7,0','6,0','0,7','1,7','7,7','6,7','0,1','7,1'],
     water:    ['0,2','0,3','0,4','0,5','1,2','1,3','1,4','1,5','2,3','2,4'],
     playerStart: [
-      { id:'p1', x:2, y:6 },
-      { id:'p2', x:3, y:7 },
-      { id:'p3', x:2, y:5 },
-      { id:'p4', x:3, y:6 },
+      { id:'aldric', x:2, y:6 },
+      { id:'lyra',   x:3, y:7 },
+      { id:'kael',   x:2, y:5 },
+      { id:'zara',   x:3, y:6 },
     ],
     enemyStart: [
-      { id:'e1', x:5, y:1 },
-      { id:'e2', x:6, y:2 },
-      { id:'e3', x:5, y:0 },
-      { id:'e4', x:7, y:1 },
+      { id:'grunt',      x:5, y:1 },
+      { id:'darkwraith', x:6, y:2 },
+      { id:'brute',      x:5, y:0 },
+      { id:'sister',     x:7, y:1 },
     ],
   },
 
@@ -67,18 +67,18 @@ const MAP_DEFINITIONS = {
     water: ['0,0','7,0'],
     // Players start bottom-center, funneled into the three lanes
     playerStart: [
-      { id:'p1', x:3, y:6 },
-      { id:'p2', x:4, y:6 },
-      { id:'p3', x:3, y:7 },
-      { id:'p4', x:4, y:7 },
+      { id:'aldric', x:3, y:6 },
+      { id:'lyra',   x:4, y:6 },
+      { id:'kael',   x:3, y:7 },
+      { id:'zara',   x:4, y:7 },
     ],
     // Enemies start top-center, mirroring player approach
     // (3,1) and (4,1) are clear — wall at x=2,x=5 starts at y=1 but x=3,4 are open
     enemyStart: [
-      { id:'e1', x:3, y:1 },
-      { id:'e2', x:4, y:1 },
-      { id:'e3', x:3, y:0 },
-      { id:'e4', x:4, y:0 },
+      { id:'grunt',      x:3, y:1 },
+      { id:'darkwraith', x:4, y:1 },
+      { id:'brute',      x:3, y:0 },
+      { id:'sister',     x:4, y:0 },
     ],
   },
 
@@ -113,18 +113,18 @@ const MAP_DEFINITIONS = {
     ],
     // Players on SW island (x=0–2, y=5–7)
     playerStart: [
-      { id:'p1', x:0, y:6 },
-      { id:'p2', x:1, y:6 },
-      { id:'p3', x:0, y:7 },
-      { id:'p4', x:1, y:7 },
+      { id:'aldric', x:0, y:6 },
+      { id:'lyra',   x:1, y:6 },
+      { id:'kael',   x:0, y:7 },
+      { id:'zara',   x:1, y:7 },
     ],
     // Enemies on NE island (x=5–7, y=0–2)
     // Note: (5,0) is high ground — valid start position
     enemyStart: [
-      { id:'e1', x:6, y:1 },
-      { id:'e2', x:7, y:1 },
-      { id:'e3', x:6, y:0 },
-      { id:'e4', x:7, y:0 },
+      { id:'grunt',      x:6, y:1 },
+      { id:'darkwraith', x:7, y:1 },
+      { id:'brute',      x:6, y:0 },
+      { id:'sister',     x:7, y:0 },
     ],
   },
 
@@ -157,17 +157,17 @@ const MAP_DEFINITIONS = {
     water: [],
     // Players stage on flat bottom rows — well clear of obstacles
     playerStart: [
-      { id:'p1', x:3, y:6 },
-      { id:'p2', x:4, y:6 },
-      { id:'p3', x:3, y:7 },
-      { id:'p4', x:4, y:7 },
+      { id:'aldric', x:3, y:6 },
+      { id:'lyra',   x:4, y:6 },
+      { id:'kael',   x:3, y:7 },
+      { id:'zara',   x:4, y:7 },
     ],
     // Enemies hold the high plateau — all start on high-ground tiles
     enemyStart: [
-      { id:'e1', x:3, y:0 },
-      { id:'e2', x:5, y:0 },
-      { id:'e3', x:2, y:1 },
-      { id:'e4', x:4, y:1 },
+      { id:'grunt',      x:3, y:0 },
+      { id:'darkwraith', x:5, y:0 },
+      { id:'brute',      x:2, y:1 },
+      { id:'sister',     x:4, y:1 },
     ],
   },
 
@@ -203,31 +203,30 @@ const MAP_DEFINITIONS = {
     ],
     // Players breach from the south — positions clear of obstacles and water
     playerStart: [
-      { id:'p1', x:3, y:6 },
-      { id:'p2', x:4, y:6 },
-      { id:'p3', x:3, y:7 },
-      { id:'p4', x:4, y:7 },
+      { id:'aldric', x:3, y:6 },
+      { id:'lyra',   x:4, y:6 },
+      { id:'kael',   x:3, y:7 },
+      { id:'zara',   x:4, y:7 },
     ],
     // Enemies hold the fortified center-top
     // (2,0),(3,0),(4,0),(5,0) are open (obstacles at 1,0 and 6,0 only)
     enemyStart: [
-      { id:'e1', x:3, y:0 },
-      { id:'e2', x:4, y:0 },
-      { id:'e3', x:2, y:0 },
-      { id:'e4', x:5, y:0 },
+      { id:'grunt',      x:3, y:0 },
+      { id:'darkwraith', x:4, y:0 },
+      { id:'brute',      x:2, y:0 },
+      { id:'sister',     x:5, y:0 },
     ],
   },
 };
 
 // Base unit templates — positions overridden per map
 const BASE_UNITS = [
-  createUnit({ id:'p1', name:'Aldric',    job:'Knight',     hp:140,maxHp:140, mp:20, maxMp:20,  speed:3, attack:16, defense:16, moveRange:3, x:1,y:5, team:'player', abilities:['Attack','Shield Bash','Wait'] }),
-  createUnit({ id:'p2', name:'Lyra',      job:'Mage',       hp:65, maxHp:65,  mp:90, maxMp:90,  speed:8, attack:24, defense:5,  moveRange:4, x:2,y:6, team:'player', abilities:['Attack','Fireball','Heal','Wait'] }),
-  createUnit({ id:'p3', name:'Kael',      job:'Paladin',    hp:120,maxHp:120, mp:60, maxMp:60,  speed:4, attack:14, defense:18, moveRange:3, x:0,y:6, team:'player', abilities:['Attack','Holy Lance','Barrier','Wait'] }),
-  createUnit({ id:'p4', name:'Zara',      job:'Thief',      hp:80, maxHp:80,  mp:40, maxMp:40,  speed:9, attack:14, defense:6,  moveRange:5, x:1,y:6, team:'player', abilities:['Attack','Steal Mana','Smoke Bomb','Wait'] }),
-  createUnit({ id:'e1', name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:5,y:2, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
-  createUnit({ id:'e2', name:'Darkwraith',job:'Dark Knight',hp:115,maxHp:115, mp:50, maxMp:50,  speed:4, attack:22, defense:12, moveRange:2, x:6,y:1, team:'enemy',  abilities:['Attack','Dark Wave','Wait'] }),
-  createUnit({ id:'e3', name:'Brute',     job:'Berserker',  hp:130,maxHp:130, mp:0,  maxMp:0,   speed:5, attack:28, defense:7,  moveRange:3, x:4,y:1, team:'enemy',  abilities:['Attack','Rampage','Wait'] }),
-  createUnit({ id:'e4', name:'Sister',    job:'Healer',     hp:75, maxHp:75,  mp:100,maxMp:100, speed:7, attack:8,  defense:8,  moveRange:4, x:7,y:0, team:'enemy',  abilities:['Attack','Mend','Revive','Wait'] }),
+  createUnit({ id:'aldric',     name:'Aldric',    job:'Knight',     hp:140,maxHp:140, mp:20, maxMp:20,  speed:3, attack:16, defense:16, moveRange:3, x:1,y:5, team:'player', abilities:['Attack','Shield Bash','Wait'] }),
+  createUnit({ id:'lyra',       name:'Lyra',      job:'Mage',       hp:65, maxHp:65,  mp:90, maxMp:90,  speed:8, attack:24, defense:5,  moveRange:4, x:2,y:6, team:'player', abilities:['Attack','Fireball','Heal','Wait'] }),
+  createUnit({ id:'kael',       name:'Kael',      job:'Paladin',    hp:120,maxHp:120, mp:60, maxMp:60,  speed:4, attack:14, defense:18, moveRange:3, x:0,y:6, team:'player', abilities:['Attack','Holy Lance','Barrier','Wait'] }),
+  createUnit({ id:'zara',       name:'Zara',      job:'Thief',      hp:80, maxHp:80,  mp:40, maxMp:40,  speed:9, attack:14, defense:6,  moveRange:5, x:1,y:6, team:'player', abilities:['Attack','Steal Mana','Smoke Bomb','Wait'] }),
+  createUnit({ id:'grunt',      name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:5,y:2, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
+  createUnit({ id:'darkwraith', name:'Darkwraith',job:'Dark Knight',hp:115,maxHp:115, mp:50, maxMp:50,  speed:4, attack:22, defense:12, moveRange:2, x:6,y:1, team:'enemy',  abilities:['Attack','Dark Wave','Wait'] }),
+  createUnit({ id:'brute',      name:'Brute',     job:'Berserker',  hp:130,maxHp:130, mp:0,  maxMp:0,   speed:5, attack:28, defense:7,  moveRange:3, x:4,y:1, team:'enemy',  abilities:['Attack','Rampage','Wait'] }),
+  createUnit({ id:'sister',     name:'Sister',    job:'Healer',     hp:75, maxHp:75,  mp:100,maxMp:100, speed:7, attack:8,  defense:8,  moveRange:4, x:7,y:0, team:'enemy',  abilities:['Attack','Mend','Revive','Wait'] }),
 ];
-

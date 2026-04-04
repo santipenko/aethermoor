@@ -19,9 +19,14 @@ const MapSystem = (() => {
     return map;
   }
 
-  function load(mapId) {
+  function load(mapId, deployedCharacterIds) {
     const def = MAP_DEFINITIONS[mapId];
     if (!def) { console.error('[MapSystem] Unknown map:', mapId); return; }
+
+    // Propagate map dimensions to CONFIG before anything else reads them
+    CONFIG.GRID_COLS = def.cols;
+    CONFIG.GRID_ROWS = def.rows;
+
     GameState.currentMapId = mapId;
 
     // Build fresh map
@@ -29,7 +34,25 @@ const MapSystem = (() => {
 
     // Reset units with map-specific starting positions (preserve HP/MP/etc freshly)
     const allStarts = [...(def.playerStart||[]), ...(def.enemyStart||[])];
-    GameState.units = BASE_UNITS.map(template => {
+
+    let unitsToLoad;
+
+    if (deployedCharacterIds && deployedCharacterIds.length > 0) {
+      // Deploy mode — roster screen has provided a selected list
+      const capped = deployedCharacterIds.slice(0, 5); // enforce 5-unit cap
+      const playerUnits = capped
+        .map(charId => BASE_UNITS.find(u => u.id === charId))
+        .filter(Boolean); // silently skip any id not found in BASE_UNITS
+
+      const enemyUnits = BASE_UNITS.filter(u => u.team === 'enemy');
+
+      unitsToLoad = [...playerUnits, ...enemyUnits];
+    } else {
+      // Fallback — use all units from BASE_UNITS (Act 1 behavior)
+      unitsToLoad = BASE_UNITS;
+    }
+
+    GameState.units = unitsToLoad.map(template => {
       const override = allStarts.find(s => s.id === template.id);
       const u = Object.assign({}, template, { statusEffects:[], hp:template.maxHp, mp:template.maxMp });
       if (override) { u.x = override.x; u.y = override.y; }
@@ -78,4 +101,3 @@ const MapSystem = (() => {
 
 // Legacy shim — generate initial map from map_1 definition
 function generateMap(cols,rows){ return MapSystem.buildMap(MAP_DEFINITIONS.map_1); }
-

@@ -9,6 +9,9 @@ const GameStateSchema = { currentTurn:null, turnQueue:[], units:[], map:[], phas
 
 // --- SECTION: Config ---
 const CONFIG = {
+  // GRID_COLS and GRID_ROWS are runtime defaults only.
+  // MapSystem.load() overwrites these from the active map definition.
+  // Do not read these as constants — always read after a map has been loaded.
   GRID_COLS: 8, GRID_ROWS: 8, TILE_SIZE: 64, MIN_TILE_SIZE: 44,
   COLORS: {
     TILE_NORMAL:   '#1a2634',
@@ -53,4 +56,3 @@ const CONFIG = {
   },
   TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity },
 };
-
