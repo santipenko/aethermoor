@@ -36,6 +36,9 @@ const BLOCK_2 = [
 ];
 
 const BLOCK_3 = [
+  '29-world-map-data.js',
+  '30-world-map-screen.js',
+  '31-roster-screen.js',
   '23-sound-system.js',
   '24-save-system.js',
   '25-cutscene-engine.js',
@@ -61,7 +64,6 @@ function read(relPath) {
   return fs.readFileSync(abs, 'utf8');
 }
 
-// Join files with no separator — each source file already ends with a newline.
 function joinBlock(files) {
   return files.map(f => read(f)).join('');
 }
@@ -82,14 +84,6 @@ if (!fs.existsSync(DIST)) {
 }
 
 // ── Assemble ─────────────────────────────────────────────────────────────────
-// Structure mirrors the original exactly:
-//   shell.html
-//   <script> … BLOCK_1 … </script>
-//   <!-- EXTENSION comment -->
-//   <script> … BLOCK_2 … </script>
-//   shell-narrative-html.html
-//   <script> … BLOCK_3 …          ← shell-close.html provides the closing </script>
-//   shell-close.html  (</script></body></html>)
 
 const output = [
   read('shell.html'),
@@ -120,6 +114,6 @@ const lineCount = output.split('\n').length;
 console.log('');
 console.log('[build.js] Build complete');
 console.log(`  Source files : ${allFiles.length}`);
-console.log(`  Output lines : ${lineCount}  (original: 4050, delta: ${lineCount - 4050})`);
+console.log(`  Output lines : ${lineCount}`);
 console.log(`  Output path  : ${outPath}`);
 console.log('');
