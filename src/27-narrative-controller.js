@@ -2,7 +2,7 @@
 // Orchestrates the full game flow: title → cutscene → battle → cutscene → ...
 // =============================================================================
 const NarrativeController = (() => {
-  let _currentAct = 'map_1'; // 'map_1' through 'map_6'
+  let _currentAct = 'map_1'; // tracks the active mapId during battle
 
   function _hideTitleScreen() {
     const ts = document.getElementById('title-screen');
@@ -12,9 +12,31 @@ const NarrativeController = (() => {
     setTimeout(() => { ts.style.display = 'none'; }, 520);
   }
 
-  function _startBattle(mapId) {
-    // Load map and start battle
-    MapSystem.load(mapId);
+  // ── Route player to the world map, then roster, then battle ──────────────
+  function _goToWorldMap() {
+    WorldMapScreen.show((nodeId) => {
+      // Player selected a node
+      const node = WORLD_MAP_NODES[nodeId];
+      if (!node) return;
+
+      RosterScreen.show(
+        node.label,
+        (selectedIds) => {
+          // Player confirmed roster — record deploy and start battle
+          SaveSystem.recordDeploy(nodeId, selectedIds);
+          _startBattle(node.mapId, nodeId, selectedIds);
+        },
+        () => {
+          // Player pressed back — return to world map
+          _goToWorldMap();
+        }
+      );
+    });
+  }
+
+  function _startBattle(mapId, nodeId, deployedCharacterIds) {
+    // Load map with optional deploy list
+    MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
 
     // Reset turn state
@@ -86,50 +108,50 @@ const NarrativeController = (() => {
     console.log(`%c[NarrativeController] Battle started: ${mapId}`, 'color:#00e5ff;font-weight:bold');
   }
 
-  // ── Shared helper: stop drone, play victory, hide overlay, then cutscene → next ──
-  function _transition(cutsceneScenes, nextMapId) {
+  // ── Shared helper: stop drone, play victory, hide overlay, then cutscene → world map ──
+  function _transition(cutsceneScenes) {
     SoundSystem.stopDrone();
     SoundSystem.play('victory');
     setTimeout(() => {
       document.getElementById('end-overlay').style.display = 'none';
       CutsceneEngine.play(cutsceneScenes, () => {
-        _startBattle(nextMapId);
+        _goToWorldMap();
       });
     }, 1800);
   }
 
   function _onMap1Victory() {
-    // Save with next map so CONTINUE resumes at map_2
-    GameState.currentMapId = 'map_2';
+    SaveSystem.completeNode('act1_m1', 'main');
     SaveSystem.save();
-    _transition(StoryScript.MID, 'map_2');
+    _transition(StoryScript.MID);
   }
 
   function _onMap2Victory() {
-    GameState.currentMapId = 'map_3';
+    SaveSystem.completeNode('act1_m2', 'main');
     SaveSystem.save();
-    _transition(StoryScript.TRANSITION_2_3, 'map_3');
+    _transition(StoryScript.TRANSITION_2_3);
   }
 
   function _onMap3Victory() {
-    GameState.currentMapId = 'map_4';
+    SaveSystem.completeNode('act1_m3', 'main');
     SaveSystem.save();
-    _transition(StoryScript.TRANSITION_3_4, 'map_4');
+    _transition(StoryScript.TRANSITION_3_4);
   }
 
   function _onMap4Victory() {
-    GameState.currentMapId = 'map_5';
+    SaveSystem.completeNode('act1_m4', 'main');
     SaveSystem.save();
-    _transition(StoryScript.TRANSITION_4_5, 'map_5');
+    _transition(StoryScript.TRANSITION_4_5);
   }
 
   function _onMap5Victory() {
-    GameState.currentMapId = 'map_6';
+    SaveSystem.completeNode('act1_m5', 'main');
     SaveSystem.save();
-    _transition(StoryScript.TRANSITION_5_6, 'map_6');
+    _transition(StoryScript.TRANSITION_5_6);
   }
 
   function _onMap6Victory() {
+    SaveSystem.completeNode('act1_m6', 'main');
     SoundSystem.stopDrone();
     SoundSystem.play('victory');
     setTimeout(() => {
@@ -197,9 +219,9 @@ const NarrativeController = (() => {
       // Register core listeners from main engine
       registerCoreListeners();
 
-      // Play intro cutscene then start battle
+      // Play intro cutscene then start battle (Act 1 map_1 needs no roster — linear)
       CutsceneEngine.play(StoryScript.INTRO, () => {
-        _startBattle('map_1');
+        _startBattle('map_1', 'act1_m1', null);
       });
     }, 600);
   }
@@ -213,16 +235,16 @@ const NarrativeController = (() => {
     _hideTitleScreen();
     setTimeout(() => {
       const canvas = document.getElementById('game-canvas');
-      MapSystem.load(saveData.mapId);
-      SaveSystem.applyToState(saveData);
+      // Load any map temporarily to initialize the engine
+      MapSystem.load(saveData.mapId || 'map_1');
       Renderer.init(canvas);
       InputManager.attach(canvas, Renderer.getTileSize());
 
       _registerBattleEvents();
       registerCoreListeners();
 
-      _currentAct = saveData.mapId;
-      _startBattle(saveData.mapId);
+      // Route to world map — player picks their next mission
+      _goToWorldMap();
     }, 600);
   }
 
