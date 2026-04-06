@@ -2824,6 +2824,318 @@ const AISystem = (() => {
 #btn-continue:hover { background:rgba(255,215,64,0.1) !important; }
 </style>
 <script>
+// --- SECTION: World Map Data ---
+// Node structure:
+// {
+//   id: string          — matches mapId used in SaveSystem and MapSystem.load()
+//   label: string       — display name
+//   act: number         — which act this node belongs to
+//   type: string        — 'main', 'side', or 'secret'
+//   unlockCondition: object|null  — condition evaluated by SaveSystem.evaluateCondition()
+//                                   null means always available once previous node complete
+//   connections: array  — ids of nodes this connects to (for future visual routing)
+//   mapId: string       — the map definition id to load
+// }
+
+const WORLD_MAP_NODES = {
+
+  act1_m1: {
+    id: 'act1_m1', label: 'Ruins of Aethermoor', act: 1, type: 'main',
+    unlockCondition: null, connections: ['act1_m2'], mapId: 'map_1'
+  },
+
+  act1_m2: {
+    id: 'act1_m2', label: 'Ashfen Causeway', act: 1, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m1' },
+    connections: ['act1_m3'], mapId: 'map_2'
+  },
+
+  act1_m3: {
+    id: 'act1_m3', label: 'Ironhold Passage', act: 1, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m2' },
+    connections: ['act1_m4'], mapId: 'map_3'
+  },
+
+  act1_m4: {
+    id: 'act1_m4', label: 'Thornmire Shallows', act: 1, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m3' },
+    connections: ['act1_m5'], mapId: 'map_4'
+  },
+
+  act1_m5: {
+    id: 'act1_m5', label: 'Verdant Escarpment', act: 1, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m4' },
+    connections: ['act1_m6'], mapId: 'map_5'
+  },
+
+  act1_m6: {
+    id: 'act1_m6', label: 'The Shattered Keep', act: 1, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m5' },
+    connections: [], mapId: 'map_6'
+  },
+
+};
+// --- SECTION: World Map Screen ---
+const WorldMapScreen = (() => {
+
+  let _onNodeSelected = null; // callback(nodeId)
+
+  function show(onNodeSelected) {
+    _onNodeSelected = onNodeSelected;
+    _render();
+    document.getElementById('world-map-overlay').style.display = 'flex';
+  }
+
+  function hide() {
+    document.getElementById('world-map-overlay').style.display = 'none';
+  }
+
+  function _render() {
+    const saveData = SaveSystem.load();
+    const nodes = Object.values(WORLD_MAP_NODES);
+
+    // Group by act
+    const acts = {};
+    nodes.forEach(node => {
+      if (!acts[node.act]) acts[node.act] = [];
+      acts[node.act].push(node);
+    });
+
+    // Determine highest act with any available node
+    const availableActs = Object.keys(acts).filter(act =>
+      acts[act].some(n => _isAvailable(n, saveData))
+    );
+    const currentAct = availableActs.length > 0
+      ? Math.max(...availableActs.map(Number))
+      : 1;
+
+    document.getElementById('wm-act-label').textContent = `Act ${currentAct}`;
+
+    const list = document.getElementById('wm-node-list');
+    list.innerHTML = '';
+
+    // Show nodes for current act only
+    const actNodes = acts[currentAct] || [];
+    actNodes.forEach(node => {
+      const completed = _isCompleted(node, saveData);
+      const available = _isAvailable(node, saveData);
+      const locked = !completed && !available;
+
+      const el = document.createElement('div');
+      el.style.cssText = `
+        display:flex;align-items:center;justify-content:space-between;
+        padding:14px 16px;
+        border:1px solid ${completed ? 'rgba(0,229,255,0.2)' : available ? 'rgba(0,229,255,0.4)' : 'rgba(255,255,255,0.06)'};
+        background:${available ? 'rgba(0,45,65,0.6)' : 'rgba(4,9,18,0.6)'};
+        cursor:${available ? 'pointer' : 'default'};
+        opacity:${locked ? '0.4' : '1'};
+        font-family:'Courier New',monospace;
+      `;
+
+      const typeLabel = node.type === 'side' ? ' [SIDE]' : node.type === 'secret' ? ' [SECRET]' : '';
+      const statusLabel = completed ? '✓ COMPLETE' : locked ? '✗ LOCKED' : '► AVAILABLE';
+      const statusColor = completed ? 'var(--text-dim)' : locked ? 'var(--text-dim)' : 'var(--accent)';
+
+      el.innerHTML = `
+        <div>
+          <div style="
+            font-size:clamp(10px,2.2vw,13px);
+            color:${completed ? 'var(--text-dim)' : 'var(--text)'};
+            letter-spacing:0.1em;
+          ">${node.label}${typeLabel}</div>
+        </div>
+        <div style="
+          font-size:clamp(8px,1.8vw,10px);
+          color:${statusColor};
+          letter-spacing:0.15em;
+          white-space:nowrap;
+          margin-left:12px;
+        ">${statusLabel}</div>
+      `;
+
+      if (available) {
+        el.addEventListener('click', () => {
+          hide();
+          if (_onNodeSelected) _onNodeSelected(node.id);
+        });
+        el.addEventListener('touchend', e => {
+          e.preventDefault();
+          hide();
+          if (_onNodeSelected) _onNodeSelected(node.id);
+        });
+      }
+
+      list.appendChild(el);
+    });
+
+    document.getElementById('wm-status').textContent =
+      'Select a mission to continue.';
+  }
+
+  function _isCompleted(node, saveData) {
+    return !!(saveData && saveData.worldMap && saveData.worldMap[node.id] && saveData.worldMap[node.id].completed);
+  }
+
+  function _isAvailable(node, saveData) {
+    if (_isCompleted(node, saveData)) return false;
+    if (!node.unlockCondition) return true;
+    return SaveSystem.evaluateCondition(node.unlockCondition);
+  }
+
+  return { show, hide };
+
+})();
+// --- SECTION: Roster Screen ---
+const RosterScreen = (() => {
+
+  let _selectedIds = [];
+  let _onConfirm = null; // callback(selectedIds)
+  let _onBack = null;    // callback()
+  let _missionLabel = '';
+
+  function show(missionLabel, onConfirm, onBack) {
+    _selectedIds = [];
+    _onConfirm = onConfirm;
+    _onBack = onBack;
+    _missionLabel = missionLabel;
+    _render();
+    document.getElementById('roster-overlay').style.display = 'flex';
+  }
+
+  function hide() {
+    document.getElementById('roster-overlay').style.display = 'none';
+  }
+
+  function _render() {
+    document.getElementById('roster-mission-label').textContent = _missionLabel;
+    _updateCount();
+
+    const available = SaveSystem.getAvailableRoster();
+
+    const cardList = document.getElementById('roster-card-list');
+    cardList.innerHTML = '';
+
+    available.forEach(ch => {
+      // Find base unit for stats display
+      const baseUnit = BASE_UNITS.find(u => u.id === ch.id);
+      const job = ch.currentJob || ch.uniqueJob;
+      const level = ch.level || 1;
+
+      const isSelected = _selectedIds.includes(ch.id);
+
+      const card = document.createElement('div');
+      card.id = `roster-card-${ch.id}`;
+      card.style.cssText = `
+        display:flex;align-items:center;justify-content:space-between;
+        padding:12px 14px;
+        border:1px solid ${isSelected ? 'var(--accent)' : 'rgba(0,229,255,0.15)'};
+        background:${isSelected ? 'rgba(0,60,90,0.7)' : 'rgba(4,9,18,0.7)'};
+        cursor:pointer;
+        font-family:'Courier New',monospace;
+        transition:border 0.1s,background 0.1s;
+      `;
+
+      const hp  = baseUnit ? baseUnit.maxHp : '?';
+      const mp  = baseUnit ? baseUnit.maxMp : '?';
+      const atk = baseUnit ? baseUnit.attack : '?';
+      const def = baseUnit ? baseUnit.defense : '?';
+      const spd = baseUnit ? baseUnit.speed : '?';
+
+      // Job icon lookup — mirrors ICON_CHARS in renderer
+      const JOB_ICONS = {
+        'knight':'⚔','vanguard_knight':'⚔','mage':'✦','arcanist':'✦',
+        'paladin':'†','thief':'◈','shadowblade':'◈','archer':'◎',
+        'dark_knight':'☽','healer':'✚','berserker':'⚡',
+        'scout':'◎','vanguard':'⚔','warden':'✦','surveyor':'◎',
+        'archivist':'✚','lorekeeper':'✦','artificer':'☽','inquisitor':'⚔',
+      };
+      const icon = JOB_ICONS[job] || '◈';
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="
+            width:36px;height:36px;
+            border-radius:50%;
+            background:linear-gradient(135deg,#7bdcfc,#1565c0);
+            display:flex;align-items:center;justify-content:center;
+            font-size:16px;flex-shrink:0;
+            border:2px solid ${isSelected ? 'var(--accent)' : 'rgba(0,229,255,0.3)'};
+          ">${icon}</div>
+          <div>
+            <div style="
+              font-size:clamp(10px,2.2vw,13px);
+              color:var(--text);
+              letter-spacing:0.1em;
+              font-weight:bold;
+            ">${ch.id.charAt(0).toUpperCase() + ch.id.slice(1)}</div>
+            <div style="
+              font-size:clamp(8px,1.8vw,10px);
+              color:var(--text-dim);
+              letter-spacing:0.08em;
+              margin-top:2px;
+            ">${job.toUpperCase()} · LV${level}</div>
+          </div>
+        </div>
+        <div style="
+          font-size:clamp(7px,1.6vw,9px);
+          color:var(--text-dim);
+          letter-spacing:0.06em;
+          text-align:right;
+          line-height:1.6;
+        ">
+          HP ${hp} · MP ${mp}<br>
+          ATK ${atk} · DEF ${def} · SPD ${spd}
+        </div>
+        <div style="
+          margin-left:12px;
+          font-size:clamp(9px,1.8vw,11px);
+          color:${isSelected ? 'var(--accent)' : 'var(--text-dim)'};
+          letter-spacing:0.1em;
+          flex-shrink:0;
+        ">${isSelected ? '● SEL' : '○'}</div>
+      `;
+
+      card.addEventListener('click', () => _toggleCharacter(ch.id));
+      card.addEventListener('touchend', e => { e.preventDefault(); _toggleCharacter(ch.id); });
+
+      cardList.appendChild(card);
+    });
+  }
+
+  function _toggleCharacter(characterId) {
+    if (_selectedIds.includes(characterId)) {
+      _selectedIds = _selectedIds.filter(id => id !== characterId);
+    } else {
+      if (_selectedIds.length >= 5) return; // cap at 5
+      _selectedIds.push(characterId);
+    }
+    _render();
+  }
+
+  function _updateCount() {
+    const count = _selectedIds.length;
+    const countEl = document.getElementById('roster-count');
+    if (countEl) countEl.textContent = `${count} / 5 selected`;
+    const confirmBtn = document.getElementById('roster-confirm-btn');
+    if (confirmBtn) {
+      confirmBtn.style.display = count > 0 ? 'block' : 'none';
+    }
+  }
+
+  function confirm() {
+    if (_selectedIds.length === 0) return;
+    hide();
+    if (_onConfirm) _onConfirm([..._selectedIds]);
+  }
+
+  function back() {
+    hide();
+    if (_onBack) _onBack();
+  }
+
+  return { show, hide, confirm, back };
+
+})();
 // =============================================================================
 // --- SECTION: Sound System ---
 // Web Audio API procedural sound generation. No files, no libraries.
