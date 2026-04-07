@@ -12,7 +12,11 @@ const AISystem = (() => {
   }
 
   function _selectTarget(unit) {
-    const players = GameState.units.filter(u => u.team === 'player' && u.hp > 0);
+    const players = GameState.units.filter(u =>
+      u.team === 'player' &&
+      u.hp > 0 &&
+      !u.statusEffects.some(se => se.name === 'hidden') // skip hidden units
+    );
     if (!players.length) return null;
     players.sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
@@ -129,6 +133,8 @@ const AISystem = (() => {
     'Thief':       { abilityPriority: ['Steal Mana', 'Smoke Bomb', 'Attack'], targetHighestMp: true },
     'Paladin':     { abilityPriority: ['Barrier', 'Holy Lance', 'Attack'], preferBarrierAllies: true },
     'Berserker':   { abilityPriority: ['Rampage', 'Attack'], alwaysChase: true },
+    'Commander':   { abilityPriority: ['Shield Wall', 'Rally', 'Attack'], alwaysChase: false },
+    'Arcanist':    { abilityPriority: ['Suppress', 'Fireball', 'Attack'], retreatIfAdjacent: true },
   };
 
   function _turnKnight(unit, target) {
@@ -258,11 +264,9 @@ const AISystem = (() => {
   }
 
   function _turnBerserker(unit, target) {
-    // Always charge nearest enemy, use Rampage if any enemy adjacent
     const enemies = GameState.units.filter(u => u.team !== unit.team && u.hp > 0);
     const adjacent = enemies.filter(e => _chebyshev(unit.x, unit.y, e.x, e.y) === 1);
     if (adjacent.length > 0) {
-      // Use Rampage centered on self (aoeTiles uses caster pos, target pos ignored)
       _attackPhase(unit, adjacent[0], 0);
     } else {
       _moveToward(unit, target.x, target.y);
@@ -277,11 +281,9 @@ const AISystem = (() => {
   }
 
   function _turnHealer(unit, target) {
-    // Prioritise healing lowest-HP ally, then attack
     const allies = GameState.units.filter(u => u.team === unit.team && u.hp > 0 && u.id !== unit.id);
     const wounded = allies.filter(a => a.hp < a.maxHp * 0.6)
       .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
-    // Try Revive first on fallen allies
     const fallen = GameState.units.filter(u => u.team === unit.team && u.hp === 0);
     for (const f of fallen) {
       if (_chebyshev(unit.x, unit.y, f.x, f.y) <= 1 && AbilitySystem.canUse(unit, 'Revive')) {
@@ -289,14 +291,12 @@ const AISystem = (() => {
         return;
       }
     }
-    // Try Mend on wounded ally in range
     for (const w of wounded) {
       if (_chebyshev(unit.x, unit.y, w.x, w.y) <= 2 && AbilitySystem.canUse(unit, 'Mend')) {
         setTimeout(() => AbilitySystem.execute(unit, 'Mend', w.x, w.y), 350);
         return;
       }
     }
-    // Move toward most wounded ally if out of range
     if (wounded.length > 0) {
       const moveTarget = wounded[0];
       const dist = _chebyshev(unit.x, unit.y, moveTarget.x, moveTarget.y);
@@ -304,7 +304,6 @@ const AISystem = (() => {
         _moveToward(unit, moveTarget.x, moveTarget.y);
         setTimeout(() => {
           const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
-          // Re-check after move
           const stillWounded = GameState.units.filter(a => a.team === u.team && a.hp > 0 && a.id !== u.id && a.hp < a.maxHp * 0.6)
             .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
           if (stillWounded.length > 0 && _chebyshev(u.x, u.y, stillWounded[0].x, stillWounded[0].y) <= 2 && AbilitySystem.canUse(u, 'Mend')) {
@@ -316,7 +315,6 @@ const AISystem = (() => {
         return;
       }
     }
-    // No healing needed — fallback to weak attack or wait
     const abilityId = _selectAbility(unit, target);
     if (abilityId && abilityId !== 'Mend' && abilityId !== 'Revive') {
       _attackPhase(unit, target, 0);
@@ -341,10 +339,11 @@ const AISystem = (() => {
       case 'Dark Knight': _turnDarkKnight(u, target);  break;
       case 'Berserker':   _turnBerserker(u, target);   break;
       case 'Healer':      _turnHealer(u, target);      break;
+      case 'Commander':   _turnDefault(u, target);     break;
+      case 'Arcanist':    _turnMage(u, target);        break;
       default:            _turnDefault(u, target);      break;
     }
   }
 
   return { doTurn, _selectTarget, _selectAbility, AGGRESSION_PROFILES };
 })();
-

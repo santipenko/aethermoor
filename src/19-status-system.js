@@ -24,12 +24,28 @@ const StatusSystem = {
         se._originalSpeed = unit.speed;
         unit.speed = Math.floor(unit.speed / 2);
         se._applied = true;
+      } else if(se.name === 'rooted' && !se._applied){
+        se._originalMoveRange = unit.moveRange;
+        unit.moveRange = 0;
+        se._applied = true;
+      } else if(se.name === 'suppressed' && !se._applied){
+        se._suppressed = true;
+      } else if(se.name === 'rallied' && !se._applied){
+        se._originalAttack = unit.attack;
+        unit.attack += 3;
+        se._applied = true;
       }
+      // hidden: no tick behavior — handled by AI target selection
+      // ley_spent: persists, no tick behavior needed
       se.turnsLeft--;
       if(se.turnsLeft <= 0){
         expired.push(se);
         if(se.name === 'slow' && se._applied && se._originalSpeed !== undefined)
           unit.speed = se._originalSpeed;
+        if(se.name === 'rooted' && se._applied && se._originalMoveRange !== undefined)
+          unit.moveRange = se._originalMoveRange;
+        if(se.name === 'rallied' && se._applied && se._originalAttack !== undefined)
+          unit.attack = se._originalAttack;
       }
     }
     unit.statusEffects = unit.statusEffects.filter(se => !expired.includes(se));
@@ -38,4 +54,3 @@ const StatusSystem = {
     if(wasStunned) GameState._skipCurrentTurn = true;
   },
 };
-

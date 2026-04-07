@@ -22,7 +22,6 @@ const MAP_DEFINITIONS = {
   map_2: {
     label: 'Ashfen Causeway',
     cols: 8, rows: 8,
-    // Choke point of obstacles through center; wide water on west; high ground at edges
     obstacle: ['3,3','4,3','3,4','4,4','3,5'],
     high:     ['0,0','1,0','7,0','6,0','0,7','1,7','7,7','6,7','0,1','7,1'],
     water:    ['0,2','0,3','0,4','0,5','1,2','1,3','1,4','1,5','2,3','2,4'],
@@ -41,39 +40,27 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 3: Ironhold Passage ─────────────────────────────────
-  // Narrow corridors with chokepoints. Two vertical wall segments (x=2, x=5)
-  // create three lanes: left (x=0–1), center (x=3–4), right (x=6–7).
-  // A horizontal barrier at y=3 forces units to commit to a lane early.
-  // High ground rewards whoever seizes the passage entrances first.
   map_3: {
     label: 'Ironhold Passage',
     cols: 8, rows: 8,
-    // Left divider wall: x=2, rows 1–5
-    // Right divider wall: x=5, rows 1–5
-    // Center horizontal pinch: (3,3) and (4,3)
     obstacle: [
       '2,1','2,2','2,3','2,4','2,5',
       '5,1','5,2','5,3','5,4','5,5',
       '3,3','4,3',
     ],
-    // High ground at lane entrances — center-left and center-right passage mouths
     high: [
-      '1,3','1,4',   // left lane entrance (mid)
-      '6,3','6,4',   // right lane entrance (mid)
-      '3,2','4,2',   // top of center lane
-      '3,4','4,4',   // bottom of center lane (below pinch)
+      '1,3','1,4',
+      '6,3','6,4',
+      '3,2','4,2',
+      '3,4','4,4',
     ],
-    // Minimal water — two tiles at far edge corners only
     water: ['0,0','7,0'],
-    // Players start bottom-center, funneled into the three lanes
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies start top-center, mirroring player approach
-    // (3,1) and (4,1) are clear — wall at x=2,x=5 starts at y=1 but x=3,4 are open
     enemyStart: [
       { id:'grunt',      x:3, y:1 },
       { id:'darkwraith', x:4, y:1 },
@@ -83,24 +70,15 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 4: Thornmire Shallows ───────────────────────────────
-  // Heavy water (27 tiles, ~42%) forces island-hopping via a narrow central land
-  // bridge. Ranged and mobile units shine; melee must navigate carefully.
-  // Land: SW island (players), NE island (enemies), central bridge, NW/SE corners.
-  // Water covers all else — verified no unit start is on water.
   map_4: {
     label: 'Thornmire Shallows',
     cols: 8, rows: 8,
     obstacle: [],
-    // High ground on island edges and the central bridge for strategic value
     high: [
-      '5,0','5,1','5,2',  // NE island western ridge
-      '0,5','1,5',        // SW island northern edge
-      '4,2','3,4',        // bridge stepping stones
+      '5,0','5,1','5,2',
+      '0,5','1,5',
+      '4,2','3,4',
     ],
-    // 27 water tiles — every tile NOT part of an island or bridge
-    // Land tiles: NW corner (0-1,0-2), NE island (5-7,0-2),
-    //             bridge (3-4,3-4 + 2,4 + 4,2 + 5,3-4),
-    //             SW island (0-2,5-7), SE corner (6-7,5-7)
     water: [
       '2,0','3,0','4,0',
       '2,1','3,1','4,1',
@@ -111,15 +89,12 @@ const MAP_DEFINITIONS = {
       '3,6','4,6','5,6',
       '3,7','4,7','5,7',
     ],
-    // Players on SW island (x=0–2, y=5–7)
     playerStart: [
       { id:'aldric', x:0, y:6 },
       { id:'lyra',   x:1, y:6 },
       { id:'kael',   x:0, y:7 },
       { id:'zara',   x:1, y:7 },
     ],
-    // Enemies on NE island (x=5–7, y=0–2)
-    // Note: (5,0) is high ground — valid start position
     enemyStart: [
       { id:'grunt',      x:6, y:1 },
       { id:'darkwraith', x:7, y:1 },
@@ -129,40 +104,28 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 5: Verdant Escarpment ───────────────────────────────
-  // Asymmetric terrain — enemies command 21 high-ground tiles across rows 0–2.
-  // Players stage on flat ground (rows 5–7) and must push uphill through a
-  // transition zone of obstacles and scattered high tiles (rows 3–4).
-  // This map is intentionally hard for the player.
   map_5: {
     label: 'Verdant Escarpment',
     cols: 8, rows: 8,
-    // Obstacles: flanking walls in rows 0–2 and a dense transition barrier in rows 3–4
     obstacle: [
-      '7,1','0,2','7,2',          // high plateau walls
-      '2,3','3,3','5,3','6,3',    // upper transition barrier
-      '1,4','4,4','6,4',          // lower transition barrier
+      '7,1','0,2','7,2',
+      '2,3','3,3','5,3','6,3',
+      '1,4','4,4','6,4',
     ],
-    // High ground: entire plateau (rows 0–2 minus obstacles) plus scattered outcrops
     high: [
-      // Row 0 — full ridge
       '0,0','1,0','2,0','3,0','4,0','5,0','6,0','7,0',
-      // Row 1 — plateau (obstacle at 7,1)
       '0,1','1,1','2,1','3,1','4,1','5,1','6,1',
-      // Row 2 — fortified edge (obstacles at 0,2 and 7,2)
       '1,2','2,2','3,2','4,2','5,2','6,2',
-      // Scattered outcrops in transition zone
       '0,3','4,3','7,3',
       '3,4','7,4',
     ],
     water: [],
-    // Players stage on flat bottom rows — well clear of obstacles
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies hold the high plateau — all start on high-ground tiles
     enemyStart: [
       { id:'grunt',      x:3, y:0 },
       { id:'darkwraith', x:5, y:0 },
@@ -172,44 +135,33 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 6: The Shattered Keep ──────────────────────────────
-  // Climactic fortress interior: ruined outer walls with three breach points,
-  // a high-ground central courtyard, and two water pools flanking the mid-zone.
-  // Enemies hold the fortified interior; players breach from the south.
   map_6: {
     label: 'The Shattered Keep',
     cols: 8, rows: 8,
-    // Ruined outer ring — top corners + side stubs + inner fortification pillars
-    // Three natural breach gaps: far-left col (x=0,y=0 open), center (x=3-4,y=0),
-    // and far-right (x=7,y=0 open) — enemies occupy center-top gap tiles
     obstacle: [
-      '1,0','6,0',              // ruined top parapet (gaps at 0,3-4,7)
-      '0,1','0,2','7,1','7,2',  // outer side walls (top half)
-      '2,2','5,2',              // inner fortification pillars
-      '1,3','6,3',              // mid-zone corridor pinch
-      '2,4','5,4',              // mid-zone second pinch
-      '0,5','7,5',              // lower side obstacles
+      '1,0','6,0',
+      '0,1','0,2','7,1','7,2',
+      '2,2','5,2',
+      '1,3','6,3',
+      '2,4','5,4',
+      '0,5','7,5',
     ],
-    // Central courtyard high ground — controls the fight
     high: [
       '3,2','4,2',
       '3,3','4,3',
       '3,4','4,4',
-      '2,1','5,1',  // flanking high for defenders
+      '2,1','5,1',
     ],
-    // Two water pools flanking the mid-zone (SW and SE pockets)
     water: [
-      '1,4','1,5','2,5',  // SW pool (3 tiles)
-      '5,5','6,5','6,4',  // SE pool (3 tiles)
+      '1,4','1,5','2,5',
+      '5,5','6,5','6,4',
     ],
-    // Players breach from the south — positions clear of obstacles and water
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies hold the fortified center-top
-    // (2,0),(3,0),(4,0),(5,0) are open (obstacles at 1,0 and 6,0 only)
     enemyStart: [
       { id:'grunt',      x:3, y:0 },
       { id:'darkwraith', x:4, y:0 },
@@ -217,16 +169,243 @@ const MAP_DEFINITIONS = {
       { id:'sister',     x:5, y:0 },
     ],
   },
+
+  // ── Act 2 Maps ──────────────────────────────────────────────
+
+  // act2_m1 — The Ashfen Wood (8×10)
+  act2_m1: {
+    label: 'The Ashfen Wood',
+    cols: 8, rows: 10,
+    obstacle: [
+      '1,1','2,1','1,2',
+      '5,1','6,1','6,2',
+      '0,4','1,4',
+      '6,4','7,4',
+      '2,6','3,6',
+      '5,7','6,7','5,8',
+    ],
+    high: [
+      '3,1','4,1',
+      '3,4','4,4',
+      '0,7','1,7','7,7','7,8',
+    ],
+    water: [],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:2, y:8 },
+      { id:'lyra',   x:3, y:9 },
+      { id:'kael',   x:4, y:9 },
+      { id:'zara',   x:5, y:8 },
+    ],
+    enemyStart: [
+      { id:'grunt',  x:2, y:1 },
+      { id:'brute',  x:4, y:0 },
+      { id:'varek',  x:5, y:2 },
+      { id:'sister', x:3, y:0 },
+    ],
+  },
+
+  // act2_m2 — Cinder Hollow (8×8)
+  act2_m2: {
+    label: 'Cinder Hollow',
+    cols: 8, rows: 8,
+    obstacle: [
+      '2,1','3,1','4,1',
+      '2,2','4,2',
+      '5,3','5,4',
+      '1,5','1,6',
+    ],
+    high: [
+      '0,0','0,1',
+      '7,0','7,1',
+      '3,4','4,4',
+    ],
+    water: [],
+    hazard: [
+      '1,1','1,2','1,3',
+      '3,2',
+      '5,1','6,1','6,2',
+      '2,6','3,6','4,6',
+      '6,5','7,5','7,6',
+    ],
+    playerStart: [
+      { id:'aldric', x:2, y:7 },
+      { id:'lyra',   x:3, y:7 },
+      { id:'kael',   x:4, y:7 },
+      { id:'zara',   x:5, y:7 },
+      { id:'rynn',   x:1, y:7 },
+    ],
+    enemyStart: [
+      { id:'varek',  x:3, y:0 },
+      { id:'grunt',  x:5, y:2 },
+      { id:'brute',  x:1, y:4 },
+      { id:'sister', x:6, y:3 },
+    ],
+  },
+
+  // act2_m3 — The Sunken Road (6×12)
+  act2_m3: {
+    label: 'The Sunken Road',
+    cols: 6, rows: 12,
+    obstacle: [
+      '2,1','2,2','2,3',
+      '2,5','2,6','2,7',
+      '2,9','2,10','2,11',
+      '3,1','3,2','3,3',
+      '3,5','3,6','3,7',
+      '3,9','3,10','3,11',
+    ],
+    high: [
+      '1,4','4,4',
+      '1,8','4,8',
+      '0,0','5,0',
+      '0,11','5,11',
+    ],
+    water: [],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:10 },
+      { id:'lyra',   x:1, y:11 },
+      { id:'kael',   x:0, y:11 },
+      { id:'zara',   x:5, y:10 },
+      { id:'rynn',   x:5, y:11 },
+    ],
+    enemyStart: [
+      { id:'grunt',  x:1, y:1 },
+      { id:'brute',  x:0, y:0 },
+      { id:'varek',  x:4, y:1 },
+      { id:'sister', x:5, y:0 },
+    ],
+  },
+
+  // act2_side1 — The Ley Scar (8×8)
+  act2_side1: {
+    label: 'The Ley Scar',
+    cols: 8, rows: 8,
+    obstacle: [
+      '3,3','4,3','3,4','4,4',
+    ],
+    high: [
+      '0,0','1,0','6,0','7,0',
+      '0,7','1,7','6,7','7,7',
+      '2,2','5,2','2,5','5,5',
+    ],
+    water: [
+      '2,3','2,4',
+      '5,3','5,4',
+      '3,1','4,1',
+      '3,6','4,6',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:6 },
+      { id:'lyra',   x:1, y:7 },
+      { id:'kael',   x:0, y:7 },
+      { id:'zara',   x:1, y:6 },
+      { id:'rynn',   x:2, y:7 },
+    ],
+    enemyStart: [
+      { id:'solen',   x:4, y:0 },
+      { id:'grunt',   x:3, y:0 },
+      { id:'grunt_b', x:5, y:1 },
+      { id:'sister',  x:4, y:1 },
+    ],
+  },
+
+  // act2_m4 — Thornback Ridge (10×8)
+  act2_m4: {
+    label: 'Thornback Ridge',
+    cols: 10, rows: 8,
+    obstacle: [
+      '2,1','2,6',
+      '4,2','4,5',
+      '6,1','6,2','6,5','6,6',
+      '7,3','8,3',
+    ],
+    high: [
+      '5,3','5,4',
+      '7,0','8,0','9,0',
+      '7,7','8,7','9,7',
+      '7,1','7,2','7,5','7,6',
+      '8,2','8,5','9,2','9,5',
+    ],
+    water: [
+      '0,3','0,4','1,3','1,4',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:2 },
+      { id:'lyra',   x:0, y:5 },
+      { id:'kael',   x:1, y:2 },
+      { id:'zara',   x:0, y:3 },
+      { id:'rynn',   x:1, y:5 },
+    ],
+    enemyStart: [
+      { id:'varek',  x:8, y:3 },
+      { id:'solen',  x:9, y:2 },
+      { id:'grunt',  x:7, y:1 },
+      { id:'brute',  x:7, y:6 },
+      { id:'sister', x:9, y:5 },
+    ],
+  },
+
+  // act2_m5 — The Relay Station (8×8)
+  act2_m5: {
+    label: 'The Relay Station',
+    cols: 8, rows: 8,
+    obstacle: [
+      '1,1','6,1',
+      '0,2','7,2',
+      '2,2','5,2',
+      '2,5','5,5',
+      '0,5','7,5',
+    ],
+    high: [
+      '3,2','4,2',
+      '3,3','4,3',
+      '3,4','4,4',
+      '2,1','5,1',
+    ],
+    water: [
+      '1,3','1,4',
+      '6,3','6,4',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:2, y:7 },
+      { id:'lyra',   x:3, y:7 },
+      { id:'kael',   x:4, y:7 },
+      { id:'zara',   x:5, y:7 },
+      { id:'rynn',   x:1, y:6 },
+    ],
+    enemyStart: [
+      { id:'solen',   x:3, y:1 },
+      { id:'varek',   x:4, y:2 },
+      { id:'grunt',   x:2, y:3 },
+      { id:'brute',   x:5, y:3 },
+      { id:'sister',  x:3, y:0 },
+      { id:'grunt_b', x:5, y:0 },
+    ],
+  },
 };
 
 // Base unit templates — positions overridden per map
 const BASE_UNITS = [
+  // ── Player characters ──────────────────────────────────────
   createUnit({ id:'aldric',     name:'Aldric',    job:'Knight',     hp:140,maxHp:140, mp:20, maxMp:20,  speed:3, attack:16, defense:16, moveRange:3, x:1,y:5, team:'player', abilities:['Attack','Shield Bash','Wait'] }),
   createUnit({ id:'lyra',       name:'Lyra',      job:'Mage',       hp:65, maxHp:65,  mp:90, maxMp:90,  speed:8, attack:24, defense:5,  moveRange:4, x:2,y:6, team:'player', abilities:['Attack','Fireball','Heal','Wait'] }),
   createUnit({ id:'kael',       name:'Kael',      job:'Paladin',    hp:120,maxHp:120, mp:60, maxMp:60,  speed:4, attack:14, defense:18, moveRange:3, x:0,y:6, team:'player', abilities:['Attack','Holy Lance','Barrier','Wait'] }),
   createUnit({ id:'zara',       name:'Zara',      job:'Thief',      hp:80, maxHp:80,  mp:40, maxMp:40,  speed:9, attack:14, defense:6,  moveRange:5, x:1,y:6, team:'player', abilities:['Attack','Steal Mana','Smoke Bomb','Wait'] }),
+  // Act 2 recruits
+  createUnit({ id:'rynn',       name:'Rynn',      job:'Scout',      hp:72, maxHp:72,  mp:40, maxMp:40,  speed:10, attack:13, defense:6,  moveRange:5, x:0,y:0, team:'player', abilities:['Attack','Scout Shot','Vanish','Wait'] }),
+  createUnit({ id:'eska',       name:'Eska',      job:'Warden',     hp:78, maxHp:78,  mp:70, maxMp:70,  speed:6,  attack:11, defense:10, moveRange:3, x:0,y:0, team:'player', abilities:['Attack','Root','Ley Pulse','Wait'] }),
+  // ── Enemy characters ───────────────────────────────────────
   createUnit({ id:'grunt',      name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:5,y:2, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
   createUnit({ id:'darkwraith', name:'Darkwraith',job:'Dark Knight',hp:115,maxHp:115, mp:50, maxMp:50,  speed:4, attack:22, defense:12, moveRange:2, x:6,y:1, team:'enemy',  abilities:['Attack','Dark Wave','Wait'] }),
   createUnit({ id:'brute',      name:'Brute',     job:'Berserker',  hp:130,maxHp:130, mp:0,  maxMp:0,   speed:5, attack:28, defense:7,  moveRange:3, x:4,y:1, team:'enemy',  abilities:['Attack','Rampage','Wait'] }),
   createUnit({ id:'sister',     name:'Sister',    job:'Healer',     hp:75, maxHp:75,  mp:100,maxMp:100, speed:7, attack:8,  defense:8,  moveRange:4, x:7,y:0, team:'enemy',  abilities:['Attack','Mend','Revive','Wait'] }),
+  // Act 2 enemies
+  createUnit({ id:'varek',      name:'Varek',     job:'Commander',  hp:145,maxHp:145, mp:30, maxMp:30,  speed:4, attack:20, defense:15, moveRange:3, x:0,y:0, team:'enemy',  abilities:['Attack','Rally','Shield Wall','Wait'] }),
+  createUnit({ id:'solen',      name:'Solen',     job:'Arcanist',   hp:68, maxHp:68,  mp:110,maxMp:110, speed:7, attack:22, defense:6,  moveRange:4, x:0,y:0, team:'enemy',  abilities:['Attack','Fireball','Suppress','Wait'] }),
+  createUnit({ id:'grunt_b',    name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:0,y:0, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
 ];

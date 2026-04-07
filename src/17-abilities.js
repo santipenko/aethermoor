@@ -29,5 +29,27 @@ const ABILITIES = {
   'Rampage':    { id:'Rampage',    name:'Rampage',    icon:'⚡', power:14, mpCost:0,  range:1, targetType:'any',   type:'damage',    aoe:true,
     aoeTiles:(tx,ty,caster)=>{ const t=[]; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy}); return t; },
     statusEffect:null, statusChance:0, pushBack:false, description:'Strike all surrounding tiles.' },
-};
 
+  // ── Act 2 abilities ────────────────────────────────────────
+  'Scout Shot': { id:'Scout Shot', name:'Scout Shot', icon:'~', power:10, mpCost:8,  range:3, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:'slow', statusChance:1.0, pushBack:false, description:'Ranged shot. Always slows target. 8 MP.' },
+
+  'Vanish':     { id:'Vanish',     name:'Vanish',     icon:'◎', power:0,  mpCost:14, range:0, targetType:'self',  type:'buff',   aoe:false, aoeTiles:null, statusEffect:'hidden', statusChance:1.0, pushBack:false, description:'Become untargetable by enemies for 1 turn. 14 MP.' },
+
+  'Root':       { id:'Root',       name:'Root',       icon:'❧', power:0,  mpCost:10, range:2, targetType:'enemy', type:'root',   aoe:false, aoeTiles:null, statusEffect:'rooted', statusChance:1.0, pushBack:false, description:'Immobilize target for 2 turns. 10 MP.' },
+
+  'Ley Pulse':  { id:'Ley Pulse',  name:'Ley Pulse',  icon:'◈', power:12, mpCost:0,  range:1, targetType:'any',   type:'damage', aoe:true,
+    aoeTiles:(tx,ty,caster)=>{
+      const t=[];
+      for(let dy=-1;dy<=1;dy++)
+        for(let dx=-1;dx<=1;dx++)
+          if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy});
+      return t;
+    },
+    statusEffect:null, statusChance:0, pushBack:false, description:'AoE pulse around caster. Free once per battle.' },
+
+  'Rally':      { id:'Rally',      name:'Rally',      icon:'!', power:0,  mpCost:12, range:0, targetType:'self',  type:'rally',  aoe:false, aoeTiles:null, statusEffect:'rallied', statusChance:1.0, pushBack:false, description:'Boost adjacent allies attack for 2 turns. 12 MP.' },
+
+  'Shield Wall':{ id:'Shield Wall',name:'Shield Wall',icon:'◉', power:0,  mpCost:18, range:0, targetType:'self',  type:'shield_wall', aoe:false, aoeTiles:null, statusEffect:'shield', statusChance:1.0, pushBack:false, description:'Grant shield to self and adjacent allies. 18 MP.' },
+
+  'Suppress':   { id:'Suppress',   name:'Suppress',   icon:')', power:0,  mpCost:20, range:3, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:1.0, pushBack:false, description:'Silence target for 2 turns. Cannot use abilities. 20 MP.' },
+};

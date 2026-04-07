@@ -31,8 +31,6 @@
       touch-action: none;
       background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.013) 2px, rgba(0,229,255,0.013) 4px);
     }
-
-    /* Scanline overlay for cyberpunk aesthetic */
     html::after {
       content: '';
       position: fixed;
@@ -47,7 +45,6 @@
         rgba(0, 0, 0, 0.04) 4px
       );
     }
-
     #game-wrapper {
       display: flex;
       flex-direction: column;
@@ -56,8 +53,6 @@
       width: 100%;
       height: 100%;
     }
-
-    /* ── Header ─────────────────────────────────────────────── */
     #header {
       width: 100%;
       display: flex;
@@ -72,7 +67,6 @@
       position: relative;
       overflow: hidden;
     }
-    /* Accent glow line at bottom of header */
     #header::after {
       content: '';
       position: absolute;
@@ -103,8 +97,6 @@
       margin-right: 3px;
       vertical-align: middle;
     }
-
-    /* Map select button */
     #map-select-btn {
       background: transparent;
       border: 1px solid var(--border);
@@ -122,8 +114,6 @@
       background: var(--accent-dim);
       color: var(--accent);
     }
-
-    /* ── Canvas container ────────────────────────────────────── */
     #canvas-container {
       position: relative;
       display: flex;
@@ -144,8 +134,6 @@
       max-height: 100%;
       filter: drop-shadow(0 0 14px rgba(0,180,255,0.12));
     }
-
-    /* ── Footer ─────────────────────────────────────────────── */
     #footer {
       width: 100%;
       display: flex;
@@ -163,7 +151,6 @@
       position: relative;
       overflow: hidden;
     }
-    /* Accent glow line at top of footer */
     #footer::before {
       content: '';
       position: absolute;
@@ -197,8 +184,6 @@
       border-radius: 2px;
       display: inline-block;
     }
-
-    /* ── End overlay ─────────────────────────────────────────── */
     #end-overlay {
       display: none;
       position: absolute;
@@ -241,8 +226,6 @@
       background: var(--accent);
       color: #000;
     }
-
-    /* ── Responsive: small screens ───────────────────────────── */
     @media (max-width: 420px) {
       #header .legend { display: none; }
     }
@@ -253,7 +236,6 @@
     @media (max-height: 500px) {
       :root { --panel-h: 26px; }
     }
-
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 2px; }
@@ -268,7 +250,7 @@
       <span><span class="dot" style="background:#ef5350"></span>Enemy</span>
       <span><span class="dot" style="background:#ffd740"></span>Active</span>
     </div>
-    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP ▸</button>
+    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP &#9658;</button>
     <button id="undo-move-btn" onclick="MovementSystem.undoMove()" style="
       display:none;
       background:transparent;
@@ -282,7 +264,7 @@
       border-radius:2px;
       transition:background 0.15s,color 0.15s;
       white-space:nowrap;
-    ">↩ UNDO</button>
+    ">&#8617; UNDO</button>
   </header>
 
   <div id="canvas-container">
@@ -302,7 +284,7 @@
       <span><span class="swatch" style="background:#223344;border:1px solid #2a3f55"></span>High</span>
       <span><span class="swatch" style="background:#0a1f35;border:1px solid #2a3f55"></span>Water</span>
       <span><span class="swatch" style="background:#0d1117;border:1px solid #2a3f55"></span>Rock</span>
+      <span><span class="swatch" style="background:#2a0e00;border:1px solid #2a3f55"></span>Fire</span>
     </div>
   </footer>
 </div>
-

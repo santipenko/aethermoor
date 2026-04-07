@@ -21,8 +21,9 @@ const WaterAnim = {
   },
   check() {
     const hasWater = GameState.map.some(row => row.some(t => t.terrain === 'water'));
-    if (hasWater && !this.active) this.start();
-    else if (!hasWater && this.active) this.stop();
+    const hasHazard = GameState.map.some(row => row.some(t => t.terrain === 'hazard'));
+    if ((hasWater || hasHazard) && !this.active) this.start();
+    else if (!hasWater && !hasHazard && this.active) this.stop();
   },
 };
 
@@ -206,3 +207,45 @@ function drawTerrainObstacle(ctx, tile, px, py, ts) {
   ctx.restore();
 }
 
+function drawTerrainHazard(ctx, tile, px, py, ts) {
+  const phase = WaterAnim.phase;
+
+  // Dark base
+  ctx.fillStyle = CONFIG.COLORS.TILE_HAZARD;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Animated fire shimmer
+  const alpha1 = 0.18 + 0.10 * Math.sin(phase * 1.3 + tile.x * 0.7);
+  ctx.fillStyle = `rgba(255,80,0,${alpha1.toFixed(3)})`;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Fire flicker lines
+  ctx.save();
+  ctx.rect(px, py, ts, ts);
+  ctx.clip();
+  for(let fi = 0; fi < 3; fi++){
+    const fPhase = phase * 1.8 + fi * 1.2 + tile.x * 0.4 + tile.y * 0.3;
+    const fy = py + ts * (0.5 + fi * 0.18) - Math.abs(Math.sin(fPhase)) * ts * 0.3;
+    const falpha = 0.2 + 0.12 * Math.sin(phase * 1.1 + fi);
+    ctx.strokeStyle = `rgba(255,160,40,${falpha.toFixed(3)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px + ts * 0.2, fy + ts * 0.1);
+    ctx.bezierCurveTo(
+      px + ts * 0.35, fy - ts * 0.08 * Math.sin(fPhase),
+      px + ts * 0.65, fy + ts * 0.08 * Math.sin(fPhase * 0.9),
+      px + ts * 0.8, fy + ts * 0.1
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Top glow
+  const glintA = Math.max(0, 0.4 * Math.sin(phase * 2.4 + tile.x * 1.1 + tile.y * 0.6));
+  if(glintA > 0.08){
+    ctx.fillStyle = `rgba(255,200,60,${(glintA * 0.6).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px + ts * 0.5, py + ts * 0.25, ts * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}

@@ -41,6 +41,9 @@ const CONFIG = {
     WATER_SHIMMER:   'rgba(80,180,255,0.18)',
     OBSTACLE_CRACK:  'rgba(180,200,220,0.08)',
     NORMAL_GRAIN:    'rgba(255,255,255,0.022)',
+    // Hazard terrain
+    TILE_HAZARD:     '#2a0e00',
+    HAZARD_SHIMMER:  'rgba(255,80,0,0.22)',
     // Job accent colors
     JOB_ACCENT: {
       'Knight':     '#90caf9',
@@ -52,7 +55,11 @@ const CONFIG = {
       'Paladin':    '#80deea',
       'Berserker':  '#ff8a65',
       'Squire':     '#90caf9',
+      'Scout':      '#a8d8a8',
+      'Warden':     '#80cfa0',
+      'Commander':  '#e0a060',
+      'Arcanist':   '#ce93d8',
     },
   },
-  TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity },
+  TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity, hazard:2 },
 };

@@ -15,31 +15,36 @@ const NarrativeController = (() => {
   // ── Route player to the world map, then roster, then battle ──────────────
   function _goToWorldMap() {
     WorldMapScreen.show((nodeId) => {
-      // Player selected a node
       const node = WORLD_MAP_NODES[nodeId];
       if (!node) return;
 
       RosterScreen.show(
         node.label,
         (selectedIds) => {
-          // Player confirmed roster — record deploy and start battle
           SaveSystem.recordDeploy(nodeId, selectedIds);
           _startBattle(node.mapId, nodeId, selectedIds);
         },
         () => {
-          // Player pressed back — return to world map
           _goToWorldMap();
         }
       );
     });
   }
 
+  // ── Pre-battle scene data ─────────────────────────────────────────────────
+  const _act2PreBattle = {
+    'act2_m1': null, // ACT2_OPEN handles this map's intro
+    'act2_m2': null, // uses ACT2_TRANSITION_1_2 via victory handler
+    'act2_m3': null, // uses ACT2_TRANSITION_2_3 via victory handler
+    'act2_side1': StoryScript ? StoryScript.ACT2_SIDE1_PRE : null,
+    'act2_m4': null, // uses ACT2_TRANSITION_3_4 via victory handler
+    'act2_m5': null, // uses ACT2_TRANSITION_4_5 via victory handler
+  };
+
   function _startBattle(mapId, nodeId, deployedCharacterIds) {
-    // Load map with optional deploy list
     MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
 
-    // Reset turn state
     GameState.currentTurn = null;
     GameState.turnQueue = [];
     GameState.selectedUnit = null;
@@ -62,29 +67,43 @@ const NarrativeController = (() => {
     SoundSystem.startDrone();
     SoundSystem.play('battleStart');
 
-    // Pre-battle scenes: banter for maps 1–4, new scenes for maps 5–6.
-    // Maps 3 and 4 chain banter → pre-battle scene before starting.
     Renderer.draw();
-    const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
-    const _preBattleMap = { map_5: StoryScript.PRE_BATTLE_5, map_6: StoryScript.PRE_BATTLE_6 };
-    const _preBattle = _preBattleMap[mapId];
-    const _startTurn = () => { TurnSystem.start(); Renderer.draw(); };
 
-    if (mapId === 'map_3' || mapId === 'map_4') {
-      // Chain: existing banter → new pre-battle scene
-      const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
-      const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
-      CutsceneEngine.play(_banter, () => {
-        CutsceneEngine.play(_scene, _startTurn);
-      });
-    } else if (_banterIndex !== undefined && StoryScript.PRE_BATTLE_BANTER[_banterIndex]) {
-      // Maps 1 and 2 — banter only
-      CutsceneEngine.play(StoryScript.PRE_BATTLE_BANTER[_banterIndex], _startTurn);
-    } else if (_preBattle) {
-      // Maps 5 and 6 — new pre-battle only
-      CutsceneEngine.play(_preBattle, _startTurn);
+    // Check for act intro cutscene (plays once on first visit)
+    const actIntros = {
+      'act2_m1': { flag: 'act2_intro_played', scenes: StoryScript.ACT2_OPEN },
+    };
+    const intro = actIntros[mapId];
+
+    const _runBattleScenes = () => {
+      const _startTurn = () => { TurnSystem.start(); Renderer.draw(); };
+      const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
+      const _preBattleMap = {
+        map_5: StoryScript.PRE_BATTLE_5,
+        map_6: StoryScript.PRE_BATTLE_6
+      };
+
+      // Act 2 side mission has its own pre-battle scene
+      if(mapId === 'act2_side1'){
+        CutsceneEngine.play(StoryScript.ACT2_SIDE1_PRE, _startTurn);
+      } else if(mapId === 'map_3' || mapId === 'map_4'){
+        const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
+        const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
+        CutsceneEngine.play(_banter, () => { CutsceneEngine.play(_scene, _startTurn); });
+      } else if(_banterIndex !== undefined && StoryScript.PRE_BATTLE_BANTER[_banterIndex]){
+        CutsceneEngine.play(StoryScript.PRE_BATTLE_BANTER[_banterIndex], _startTurn);
+      } else if(_preBattleMap[mapId]){
+        CutsceneEngine.play(_preBattleMap[mapId], _startTurn);
+      } else {
+        _startTurn();
+      }
+    };
+
+    if(intro && !SaveSystem.getFlag(intro.flag)){
+      SaveSystem.setFlag(intro.flag);
+      CutsceneEngine.play(intro.scenes, _runBattleScenes);
     } else {
-      _startTurn();
+      _runBattleScenes();
     }
 
     // Update map button
@@ -120,6 +139,7 @@ const NarrativeController = (() => {
     }, 1800);
   }
 
+  // ── Act 1 victory handlers ─────────────────────────────────────────────────
   function _onMap1Victory() {
     SaveSystem.completeNode('act1_m1', 'main');
     SaveSystem.save();
@@ -167,17 +187,97 @@ const NarrativeController = (() => {
     }, 1800);
   }
 
+  // ── Act 2 victory handlers ─────────────────────────────────────────────────
+  function _onAct2M1Victory() {
+    SaveSystem.completeNode('act2_m1', 'main');
+    SaveSystem.recruitCharacter('rynn');
+    SaveSystem.setFlag('heard_of_ley_scar');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.RYNN_JOIN, () => {
+        _goToWorldMap();
+      });
+    }, 1800);
+  }
+
+  function _onAct2M2Victory() {
+    SaveSystem.completeNode('act2_m2', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_1_2);
+  }
+
+  function _onAct2M3Victory() {
+    SaveSystem.completeNode('act2_m3', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_2_3);
+  }
+
+  function _onAct2Side1Victory() {
+    SaveSystem.completeNode('act2_side1', 'side');
+    SaveSystem.recruitCharacter('eska');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ESKA_JOIN, () => {
+        _goToWorldMap();
+      });
+    }, 1800);
+  }
+
+  function _onAct2M4Victory() {
+    SaveSystem.completeNode('act2_m4', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_3_4);
+  }
+
+  function _onAct2M5Victory() {
+    SaveSystem.completeNode('act2_m5', 'main');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ACT2_OUTRO, () => {
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'ACT II COMPLETE';
+        o.querySelector('#end-title').style.color = 'var(--gold)';
+        o.querySelector('#end-message').textContent = 'Flight — The hunt continues.';
+        o.style.display = 'flex';
+      });
+    }, 1800);
+  }
+
+  // ── Defeat handlers ────────────────────────────────────────────────────────
   function _onDefeat() {
     SoundSystem.stopDrone();
     SoundSystem.play('defeat');
     setTimeout(() => {
       document.getElementById('end-overlay').style.display = 'none';
       CutsceneEngine.play(StoryScript.DEFEAT_SCENE, () => {
-        // Show the defeat screen after cutscene
         const o = document.getElementById('end-overlay');
         o.querySelector('#end-title').textContent = 'DEFEAT';
         o.querySelector('#end-title').style.color = '#ef5350';
         o.querySelector('#end-message').textContent = 'The ruins claim you.';
+        o.style.display = 'flex';
+      });
+    }, 800);
+  }
+
+  function _onAct2Defeat() {
+    SoundSystem.stopDrone();
+    SoundSystem.play('defeat');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ACT2_DEFEAT, () => {
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'DEFEAT';
+        o.querySelector('#end-title').style.color = '#ef5350';
+        o.querySelector('#end-message').textContent = 'The hunt catches up with you.';
         o.style.display = 'flex';
       });
     }, 800);
@@ -195,12 +295,23 @@ const NarrativeController = (() => {
         map_4: _onMap4Victory,
         map_5: _onMap5Victory,
         map_6: _onMap6Victory,
+        act2_m1: _onAct2M1Victory,
+        act2_m2: _onAct2M2Victory,
+        act2_m3: _onAct2M3Victory,
+        act2_side1: _onAct2Side1Victory,
+        act2_m4: _onAct2M4Victory,
+        act2_m5: _onAct2M5Victory,
       };
       const handler = routes[_currentAct];
       if (handler) handler();
     });
     GameEvents.on('battle:loss', () => {
-      _onDefeat();
+      const act2Maps = ['act2_m1','act2_m2','act2_m3','act2_side1','act2_m4','act2_m5'];
+      if(act2Maps.includes(_currentAct)){
+        _onAct2Defeat();
+      } else {
+        _onDefeat();
+      }
     });
   }
 
@@ -209,14 +320,12 @@ const NarrativeController = (() => {
     SoundSystem.play('click');
     _hideTitleScreen();
     setTimeout(() => {
-      // Initialize engine silently (without starting battle)
       const canvas = document.getElementById('game-canvas');
       MapSystem.load('map_1');
       Renderer.init(canvas);
       InputManager.attach(canvas, Renderer.getTileSize());
 
       _registerBattleEvents();
-      // Register core listeners from main engine
       registerCoreListeners();
 
       // Play intro cutscene then start battle (Act 1 map_1 needs no roster — linear)
@@ -235,7 +344,6 @@ const NarrativeController = (() => {
     _hideTitleScreen();
     setTimeout(() => {
       const canvas = document.getElementById('game-canvas');
-      // Load any map temporarily to initialize the engine
       MapSystem.load(saveData.mapId || 'map_1');
       Renderer.init(canvas);
       InputManager.attach(canvas, Renderer.getTileSize());
@@ -243,7 +351,6 @@ const NarrativeController = (() => {
       _registerBattleEvents();
       registerCoreListeners();
 
-      // Route to world map — player picks their next mission
       _goToWorldMap();
     }, 600);
   }
@@ -285,7 +392,6 @@ const NarrativeController = (() => {
         ctx.fillStyle = `rgba(180,220,255,${s.a.toFixed(2)})`;
         ctx.fill();
       });
-      // Horizontal scan line sweep
       const sweep = (Date.now() / 3000) % 1;
       const sg = ctx.createLinearGradient(0, sweep * c.height - 40, 0, sweep * c.height + 40);
       sg.addColorStop(0, 'rgba(0,229,255,0)');
@@ -305,7 +411,6 @@ const NarrativeController = (() => {
   }
 
   function _initTitleAnimation() {
-    // Animate title content in
     const content = document.getElementById('title-content');
     if (content) {
       content.style.opacity = '0';

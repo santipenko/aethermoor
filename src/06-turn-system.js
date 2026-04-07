@@ -15,6 +15,25 @@ const TurnSystem = (() => {
     GameState._skipCurrentTurn=false;
     const unit=getUnit(nextId);
     if(unit){ StatusSystem.tick(unit); }
+    // Hazard damage — unit takes damage if standing on a hazard tile
+    if(unit && unit.hp > 0){
+      const tile = GameState.map[unit.y] && GameState.map[unit.y][unit.x];
+      if(tile && tile.terrain === 'hazard'){
+        const hazardDmg = 8;
+        unit.hp = Math.max(0, unit.hp - hazardDmg);
+        GameEvents.emit('unit:damaged', { unit, damage: hazardDmg, attackerId: 'hazard' });
+        GameState.floatingTexts.push({
+          x: unit.x, y: unit.y,
+          text: `\uD83D\uDD25${hazardDmg}`,
+          color: '#ff6600',
+          age: 0, maxAge: 30
+        });
+        if(unit.hp <= 0){
+          GameState.map[unit.y][unit.x].occupied = false;
+          GameEvents.emit('unit:defeated', { unit, attackerId: 'hazard' });
+        }
+      }
+    }
     if(checkBattleEnd())return;
     const fresh=getUnit(nextId);
     if(!fresh||fresh.hp<=0){ advanceTurn(); return; }
@@ -41,4 +60,3 @@ const TurnSystem = (() => {
   }
   return { start, advanceTurn, endTurn, buildQueue, checkBattleEnd };
 })();
-

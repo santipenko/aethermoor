@@ -4,6 +4,7 @@ const MapSystem = (() => {
     const obs = new Set(def.obstacle || []);
     const hi  = new Set(def.high     || []);
     const wat = new Set(def.water    || []);
+    const haz = new Set(def.hazard   || []);
     const map = [];
     for(let r=0;r<def.rows;r++){
       map[r]=[];
@@ -13,6 +14,7 @@ const MapSystem = (() => {
         if(obs.has(k)){ terrain='obstacle'; elevation=2; }
         else if(hi.has(k)){ terrain='high'; elevation=1; }
         else if(wat.has(k)){ terrain='water'; elevation=-1; }
+        else if(haz.has(k)){ terrain='hazard'; elevation=0; }
         map[r][c]=Object.assign({},TileSchema,{x:c,y:r,terrain,elevation,occupied:false});
       }
     }

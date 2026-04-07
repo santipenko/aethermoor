@@ -1,6 +1,12 @@
 // --- SECTION: Ability System ---
 const AbilitySystem = {
-  getAbilities(unit){ return (unit.abilities||[]).map(id=>ABILITIES[id]).filter(Boolean); },
+  getAbilities(unit){
+    const suppressed = unit.statusEffects.some(se => se.name === 'suppressed');
+    return (unit.abilities||[])
+      .map(id => ABILITIES[id])
+      .filter(Boolean)
+      .filter(ab => !suppressed || ab.id === 'Attack' || ab.id === 'Wait');
+  },
   canUse(unit, abilityId){
     const ab = ABILITIES[abilityId]; if(!ab)return false;
     if(ab.type==='wait')return true;
@@ -10,6 +16,8 @@ const AbilitySystem = {
     const ab = ABILITIES[abilityId]; if(!ab||ab.type==='wait')return [];
     // Smoke Bomb: self-cast, no tile targeting needed — return caster tile
     if(ab.type === 'smoke') return [{x:actingUnit.x, y:actingUnit.y}];
+    // Rally, Shield Wall, Vanish: self-cast
+    if(ab.type === 'rally' || ab.type === 'shield_wall' || (ab.type === 'buff' && ab.id === 'Vanish')) return [{x:actingUnit.x, y:actingUnit.y}];
     const targets = [];
     for(let row=0;row<CONFIG.GRID_ROWS;row++){
       for(let col=0;col<CONFIG.GRID_COLS;col++){
@@ -19,12 +27,14 @@ const AbilitySystem = {
         const tile = GameState.map[row][col];
         if(!tile) continue;
         if(ab.type === 'revive'){
-          // Target fallen allies (hp === 0)
           const fallen = GameState.units.find(u => u.x===col && u.y===row && u.hp===0 && u.team===actingUnit.team);
           if(fallen) targets.push({x:col,y:row});
         } else if(ab.type === 'buff' || ab.type === 'heal' || ab.targetType === 'ally'){
           const u = getUnitAt(col, row);
           if(u && u.team === actingUnit.team) targets.push({x:col,y:row});
+        } else if(ab.type === 'root' || ab.type === 'suppress'){
+          const u = getUnitAt(col, row);
+          if(u && u.team !== actingUnit.team) targets.push({x:col,y:row});
         } else {
           if(ab.aoe){
             if(tile.terrain !== 'obstacle') targets.push({x:col,y:row});
@@ -44,6 +54,15 @@ const AbilitySystem = {
       GameState.floatingTexts.push({x:actingUnit.x,y:actingUnit.y,text:'NO MP!',color:'#6090ff',age:0,maxAge:30});
       Renderer.draw(); return;
     }
+    // Ley Pulse — once per battle
+    if(abilityId === 'Ley Pulse'){
+      const alreadyUsed = actingUnit.statusEffects.find(se => se.name === 'ley_spent');
+      if(alreadyUsed){
+        GameState.floatingTexts.push({x:actingUnit.x,y:actingUnit.y,text:'SPENT',color:'#6090ff',age:0,maxAge:30});
+        Renderer.draw(); return;
+      }
+      StatusSystem.apply(actingUnit, 'ley_spent', 999);
+    }
     actingUnit.mp = Math.max(0, actingUnit.mp - ab.mpCost);
     GameEvents.emit('ability:used', { unit:actingUnit, abilityId, targetX, targetY });
     // --- Smoke Bomb: hits nearby enemies by distance, not tile loop ---
@@ -62,6 +81,42 @@ const AbilitySystem = {
       setTimeout(()=>TurnSystem.endTurn(), 400);
       return;
     }
+    // --- Rally: buff self + adjacent allies ---
+    if(ab.type === 'rally'){
+      StatusSystem.apply(actingUnit, 'rallied', 2);
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      for(const [dx,dy] of dirs){
+        const nx = actingUnit.x+dx, ny = actingUnit.y+dy;
+        if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS) continue;
+        const ally = getUnitAt(nx, ny);
+        if(ally && ally.team === actingUnit.team && ally.id !== actingUnit.id){
+          StatusSystem.apply(ally, 'rallied', 2);
+        }
+      }
+      GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(), 400);
+      return;
+    }
+    // --- Shield Wall: shield self + adjacent allies ---
+    if(ab.type === 'shield_wall'){
+      StatusSystem.apply(actingUnit, 'shield', 1);
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      for(const [dx,dy] of dirs){
+        const nx = actingUnit.x+dx, ny = actingUnit.y+dy;
+        if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS) continue;
+        const ally = getUnitAt(nx, ny);
+        if(ally && ally.team === actingUnit.team && ally.id !== actingUnit.id){
+          StatusSystem.apply(ally, 'shield', 1);
+        }
+      }
+      GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(), 400);
+      return;
+    }
     let affectedTiles = [{x:targetX,y:targetY}];
     if(ab.aoe && ab.aoeTiles) affectedTiles = ab.aoeTiles(targetX, targetY, actingUnit);
     for(const tile of affectedTiles){
@@ -71,7 +126,6 @@ const AbilitySystem = {
         if(!tu||tu.id===actingUnit.id)continue;
         if(!ab.aoe && tu.team===actingUnit.team)continue;
         let dmg = CombatMath.calcDamage(actingUnit, tu, ab);
-        // Shield: halve damage and consume shield
         const shieldEffect = tu.statusEffects.find(se => se.name === 'shield');
         if(shieldEffect){
           dmg = Math.ceil(dmg * 0.5);
@@ -127,8 +181,25 @@ const AbilitySystem = {
           GameEvents.emit('unit:defeated', { unit:tu, attackerId:actingUnit.id });
         }
       } else if(ab.type === 'buff'){
-        if(!tu||tu.team!==actingUnit.team) continue;
-        StatusSystem.apply(tu, 'shield', 1);
+        if(!tu) continue;
+        // Vanish: self-buff (targetType:'self')
+        if(ab.id === 'Vanish'){
+          StatusSystem.apply(actingUnit, 'hidden', 1);
+        } else {
+          // Barrier: buff ally
+          if(tu.team !== actingUnit.team) continue;
+          if(ab.statusEffect){
+            StatusSystem.apply(tu, ab.statusEffect, 1);
+          } else {
+            StatusSystem.apply(tu, 'shield', 1);
+          }
+        }
+      } else if(ab.type === 'root'){
+        if(!tu || tu.team === actingUnit.team) continue;
+        StatusSystem.apply(tu, 'rooted', 2);
+      } else if(ab.type === 'suppress'){
+        if(!tu || tu.team === actingUnit.team) continue;
+        StatusSystem.apply(tu, 'suppressed', 2);
       }
     }
     GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
@@ -148,4 +219,3 @@ const AbilitySystem = {
     GameState.map[ny][nx].occupied=true;
   },
 };
-
