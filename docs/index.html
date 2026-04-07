@@ -31,8 +31,6 @@
       touch-action: none;
       background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.013) 2px, rgba(0,229,255,0.013) 4px);
     }
-
-    /* Scanline overlay for cyberpunk aesthetic */
     html::after {
       content: '';
       position: fixed;
@@ -47,7 +45,6 @@
         rgba(0, 0, 0, 0.04) 4px
       );
     }
-
     #game-wrapper {
       display: flex;
       flex-direction: column;
@@ -56,8 +53,6 @@
       width: 100%;
       height: 100%;
     }
-
-    /* ── Header ─────────────────────────────────────────────── */
     #header {
       width: 100%;
       display: flex;
@@ -72,7 +67,6 @@
       position: relative;
       overflow: hidden;
     }
-    /* Accent glow line at bottom of header */
     #header::after {
       content: '';
       position: absolute;
@@ -103,8 +97,6 @@
       margin-right: 3px;
       vertical-align: middle;
     }
-
-    /* Map select button */
     #map-select-btn {
       background: transparent;
       border: 1px solid var(--border);
@@ -122,8 +114,6 @@
       background: var(--accent-dim);
       color: var(--accent);
     }
-
-    /* ── Canvas container ────────────────────────────────────── */
     #canvas-container {
       position: relative;
       display: flex;
@@ -144,8 +134,6 @@
       max-height: 100%;
       filter: drop-shadow(0 0 14px rgba(0,180,255,0.12));
     }
-
-    /* ── Footer ─────────────────────────────────────────────── */
     #footer {
       width: 100%;
       display: flex;
@@ -163,7 +151,6 @@
       position: relative;
       overflow: hidden;
     }
-    /* Accent glow line at top of footer */
     #footer::before {
       content: '';
       position: absolute;
@@ -197,8 +184,6 @@
       border-radius: 2px;
       display: inline-block;
     }
-
-    /* ── End overlay ─────────────────────────────────────────── */
     #end-overlay {
       display: none;
       position: absolute;
@@ -241,8 +226,6 @@
       background: var(--accent);
       color: #000;
     }
-
-    /* ── Responsive: small screens ───────────────────────────── */
     @media (max-width: 420px) {
       #header .legend { display: none; }
     }
@@ -253,7 +236,6 @@
     @media (max-height: 500px) {
       :root { --panel-h: 26px; }
     }
-
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 2px; }
@@ -268,7 +250,7 @@
       <span><span class="dot" style="background:#ef5350"></span>Enemy</span>
       <span><span class="dot" style="background:#ffd740"></span>Active</span>
     </div>
-    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP ▸</button>
+    <button id="map-select-btn" onclick="MapSystem.cycleMap()">MAP &#9658;</button>
     <button id="undo-move-btn" onclick="MovementSystem.undoMove()" style="
       display:none;
       background:transparent;
@@ -282,7 +264,7 @@
       border-radius:2px;
       transition:background 0.15s,color 0.15s;
       white-space:nowrap;
-    ">↩ UNDO</button>
+    ">&#8617; UNDO</button>
   </header>
 
   <div id="canvas-container">
@@ -302,10 +284,10 @@
       <span><span class="swatch" style="background:#223344;border:1px solid #2a3f55"></span>High</span>
       <span><span class="swatch" style="background:#0a1f35;border:1px solid #2a3f55"></span>Water</span>
       <span><span class="swatch" style="background:#0d1117;border:1px solid #2a3f55"></span>Rock</span>
+      <span><span class="swatch" style="background:#2a0e00;border:1px solid #2a3f55"></span>Fire</span>
     </div>
   </footer>
 </div>
-
 <script>
 // =============================================================================
 // TACTICAL RPG ENGINE
@@ -350,6 +332,9 @@ const CONFIG = {
     WATER_SHIMMER:   'rgba(80,180,255,0.18)',
     OBSTACLE_CRACK:  'rgba(180,200,220,0.08)',
     NORMAL_GRAIN:    'rgba(255,255,255,0.022)',
+    // Hazard terrain
+    TILE_HAZARD:     '#2a0e00',
+    HAZARD_SHIMMER:  'rgba(255,80,0,0.22)',
     // Job accent colors
     JOB_ACCENT: {
       'Knight':     '#90caf9',
@@ -361,9 +346,13 @@ const CONFIG = {
       'Paladin':    '#80deea',
       'Berserker':  '#ff8a65',
       'Squire':     '#90caf9',
+      'Scout':      '#a8d8a8',
+      'Warden':     '#80cfa0',
+      'Commander':  '#e0a060',
+      'Arcanist':   '#ce93d8',
     },
   },
-  TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity },
+  TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity, hazard:2 },
 };
 // --- SECTION: Event Bus ---
 const GameEvents = (() => {
@@ -415,7 +404,6 @@ const MAP_DEFINITIONS = {
   map_2: {
     label: 'Ashfen Causeway',
     cols: 8, rows: 8,
-    // Choke point of obstacles through center; wide water on west; high ground at edges
     obstacle: ['3,3','4,3','3,4','4,4','3,5'],
     high:     ['0,0','1,0','7,0','6,0','0,7','1,7','7,7','6,7','0,1','7,1'],
     water:    ['0,2','0,3','0,4','0,5','1,2','1,3','1,4','1,5','2,3','2,4'],
@@ -434,39 +422,27 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 3: Ironhold Passage ─────────────────────────────────
-  // Narrow corridors with chokepoints. Two vertical wall segments (x=2, x=5)
-  // create three lanes: left (x=0–1), center (x=3–4), right (x=6–7).
-  // A horizontal barrier at y=3 forces units to commit to a lane early.
-  // High ground rewards whoever seizes the passage entrances first.
   map_3: {
     label: 'Ironhold Passage',
     cols: 8, rows: 8,
-    // Left divider wall: x=2, rows 1–5
-    // Right divider wall: x=5, rows 1–5
-    // Center horizontal pinch: (3,3) and (4,3)
     obstacle: [
       '2,1','2,2','2,3','2,4','2,5',
       '5,1','5,2','5,3','5,4','5,5',
       '3,3','4,3',
     ],
-    // High ground at lane entrances — center-left and center-right passage mouths
     high: [
-      '1,3','1,4',   // left lane entrance (mid)
-      '6,3','6,4',   // right lane entrance (mid)
-      '3,2','4,2',   // top of center lane
-      '3,4','4,4',   // bottom of center lane (below pinch)
+      '1,3','1,4',
+      '6,3','6,4',
+      '3,2','4,2',
+      '3,4','4,4',
     ],
-    // Minimal water — two tiles at far edge corners only
     water: ['0,0','7,0'],
-    // Players start bottom-center, funneled into the three lanes
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies start top-center, mirroring player approach
-    // (3,1) and (4,1) are clear — wall at x=2,x=5 starts at y=1 but x=3,4 are open
     enemyStart: [
       { id:'grunt',      x:3, y:1 },
       { id:'darkwraith', x:4, y:1 },
@@ -476,24 +452,15 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 4: Thornmire Shallows ───────────────────────────────
-  // Heavy water (27 tiles, ~42%) forces island-hopping via a narrow central land
-  // bridge. Ranged and mobile units shine; melee must navigate carefully.
-  // Land: SW island (players), NE island (enemies), central bridge, NW/SE corners.
-  // Water covers all else — verified no unit start is on water.
   map_4: {
     label: 'Thornmire Shallows',
     cols: 8, rows: 8,
     obstacle: [],
-    // High ground on island edges and the central bridge for strategic value
     high: [
-      '5,0','5,1','5,2',  // NE island western ridge
-      '0,5','1,5',        // SW island northern edge
-      '4,2','3,4',        // bridge stepping stones
+      '5,0','5,1','5,2',
+      '0,5','1,5',
+      '4,2','3,4',
     ],
-    // 27 water tiles — every tile NOT part of an island or bridge
-    // Land tiles: NW corner (0-1,0-2), NE island (5-7,0-2),
-    //             bridge (3-4,3-4 + 2,4 + 4,2 + 5,3-4),
-    //             SW island (0-2,5-7), SE corner (6-7,5-7)
     water: [
       '2,0','3,0','4,0',
       '2,1','3,1','4,1',
@@ -504,15 +471,12 @@ const MAP_DEFINITIONS = {
       '3,6','4,6','5,6',
       '3,7','4,7','5,7',
     ],
-    // Players on SW island (x=0–2, y=5–7)
     playerStart: [
       { id:'aldric', x:0, y:6 },
       { id:'lyra',   x:1, y:6 },
       { id:'kael',   x:0, y:7 },
       { id:'zara',   x:1, y:7 },
     ],
-    // Enemies on NE island (x=5–7, y=0–2)
-    // Note: (5,0) is high ground — valid start position
     enemyStart: [
       { id:'grunt',      x:6, y:1 },
       { id:'darkwraith', x:7, y:1 },
@@ -522,40 +486,28 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 5: Verdant Escarpment ───────────────────────────────
-  // Asymmetric terrain — enemies command 21 high-ground tiles across rows 0–2.
-  // Players stage on flat ground (rows 5–7) and must push uphill through a
-  // transition zone of obstacles and scattered high tiles (rows 3–4).
-  // This map is intentionally hard for the player.
   map_5: {
     label: 'Verdant Escarpment',
     cols: 8, rows: 8,
-    // Obstacles: flanking walls in rows 0–2 and a dense transition barrier in rows 3–4
     obstacle: [
-      '7,1','0,2','7,2',          // high plateau walls
-      '2,3','3,3','5,3','6,3',    // upper transition barrier
-      '1,4','4,4','6,4',          // lower transition barrier
+      '7,1','0,2','7,2',
+      '2,3','3,3','5,3','6,3',
+      '1,4','4,4','6,4',
     ],
-    // High ground: entire plateau (rows 0–2 minus obstacles) plus scattered outcrops
     high: [
-      // Row 0 — full ridge
       '0,0','1,0','2,0','3,0','4,0','5,0','6,0','7,0',
-      // Row 1 — plateau (obstacle at 7,1)
       '0,1','1,1','2,1','3,1','4,1','5,1','6,1',
-      // Row 2 — fortified edge (obstacles at 0,2 and 7,2)
       '1,2','2,2','3,2','4,2','5,2','6,2',
-      // Scattered outcrops in transition zone
       '0,3','4,3','7,3',
       '3,4','7,4',
     ],
     water: [],
-    // Players stage on flat bottom rows — well clear of obstacles
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies hold the high plateau — all start on high-ground tiles
     enemyStart: [
       { id:'grunt',      x:3, y:0 },
       { id:'darkwraith', x:5, y:0 },
@@ -565,44 +517,33 @@ const MAP_DEFINITIONS = {
   },
 
   // ── Map 6: The Shattered Keep ──────────────────────────────
-  // Climactic fortress interior: ruined outer walls with three breach points,
-  // a high-ground central courtyard, and two water pools flanking the mid-zone.
-  // Enemies hold the fortified interior; players breach from the south.
   map_6: {
     label: 'The Shattered Keep',
     cols: 8, rows: 8,
-    // Ruined outer ring — top corners + side stubs + inner fortification pillars
-    // Three natural breach gaps: far-left col (x=0,y=0 open), center (x=3-4,y=0),
-    // and far-right (x=7,y=0 open) — enemies occupy center-top gap tiles
     obstacle: [
-      '1,0','6,0',              // ruined top parapet (gaps at 0,3-4,7)
-      '0,1','0,2','7,1','7,2',  // outer side walls (top half)
-      '2,2','5,2',              // inner fortification pillars
-      '1,3','6,3',              // mid-zone corridor pinch
-      '2,4','5,4',              // mid-zone second pinch
-      '0,5','7,5',              // lower side obstacles
+      '1,0','6,0',
+      '0,1','0,2','7,1','7,2',
+      '2,2','5,2',
+      '1,3','6,3',
+      '2,4','5,4',
+      '0,5','7,5',
     ],
-    // Central courtyard high ground — controls the fight
     high: [
       '3,2','4,2',
       '3,3','4,3',
       '3,4','4,4',
-      '2,1','5,1',  // flanking high for defenders
+      '2,1','5,1',
     ],
-    // Two water pools flanking the mid-zone (SW and SE pockets)
     water: [
-      '1,4','1,5','2,5',  // SW pool (3 tiles)
-      '5,5','6,5','6,4',  // SE pool (3 tiles)
+      '1,4','1,5','2,5',
+      '5,5','6,5','6,4',
     ],
-    // Players breach from the south — positions clear of obstacles and water
     playerStart: [
       { id:'aldric', x:3, y:6 },
       { id:'lyra',   x:4, y:6 },
       { id:'kael',   x:3, y:7 },
       { id:'zara',   x:4, y:7 },
     ],
-    // Enemies hold the fortified center-top
-    // (2,0),(3,0),(4,0),(5,0) are open (obstacles at 1,0 and 6,0 only)
     enemyStart: [
       { id:'grunt',      x:3, y:0 },
       { id:'darkwraith', x:4, y:0 },
@@ -610,18 +551,245 @@ const MAP_DEFINITIONS = {
       { id:'sister',     x:5, y:0 },
     ],
   },
+
+  // ── Act 2 Maps ──────────────────────────────────────────────
+
+  // act2_m1 — The Ashfen Wood (8×10)
+  act2_m1: {
+    label: 'The Ashfen Wood',
+    cols: 8, rows: 10,
+    obstacle: [
+      '1,1','2,1','1,2',
+      '5,1','6,1','6,2',
+      '0,4','1,4',
+      '6,4','7,4',
+      '2,6','3,6',
+      '5,7','6,7','5,8',
+    ],
+    high: [
+      '3,1','4,1',
+      '3,4','4,4',
+      '0,7','1,7','7,7','7,8',
+    ],
+    water: [],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:2, y:8 },
+      { id:'lyra',   x:3, y:9 },
+      { id:'kael',   x:4, y:9 },
+      { id:'zara',   x:5, y:8 },
+    ],
+    enemyStart: [
+      { id:'grunt',  x:2, y:1 },
+      { id:'brute',  x:4, y:0 },
+      { id:'varek',  x:5, y:2 },
+      { id:'sister', x:3, y:0 },
+    ],
+  },
+
+  // act2_m2 — Cinder Hollow (8×8)
+  act2_m2: {
+    label: 'Cinder Hollow',
+    cols: 8, rows: 8,
+    obstacle: [
+      '2,1','3,1','4,1',
+      '2,2','4,2',
+      '5,3','5,4',
+      '1,5','1,6',
+    ],
+    high: [
+      '0,0','0,1',
+      '7,0','7,1',
+      '3,4','4,4',
+    ],
+    water: [],
+    hazard: [
+      '1,1','1,2','1,3',
+      '3,2',
+      '5,1','6,1','6,2',
+      '2,6','3,6','4,6',
+      '6,5','7,5','7,6',
+    ],
+    playerStart: [
+      { id:'aldric', x:2, y:7 },
+      { id:'lyra',   x:3, y:7 },
+      { id:'kael',   x:4, y:7 },
+      { id:'zara',   x:5, y:7 },
+      { id:'rynn',   x:1, y:7 },
+    ],
+    enemyStart: [
+      { id:'varek',  x:3, y:0 },
+      { id:'grunt',  x:5, y:2 },
+      { id:'brute',  x:1, y:4 },
+      { id:'sister', x:6, y:3 },
+    ],
+  },
+
+  // act2_m3 — The Sunken Road (6×12)
+  act2_m3: {
+    label: 'The Sunken Road',
+    cols: 6, rows: 12,
+    obstacle: [
+      '2,1','2,2','2,3',
+      '2,5','2,6','2,7',
+      '2,9','2,10','2,11',
+      '3,1','3,2','3,3',
+      '3,5','3,6','3,7',
+      '3,9','3,10','3,11',
+    ],
+    high: [
+      '1,4','4,4',
+      '1,8','4,8',
+      '0,0','5,0',
+      '0,11','5,11',
+    ],
+    water: [],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:10 },
+      { id:'lyra',   x:1, y:11 },
+      { id:'kael',   x:0, y:11 },
+      { id:'zara',   x:5, y:10 },
+      { id:'rynn',   x:5, y:11 },
+    ],
+    enemyStart: [
+      { id:'grunt',  x:1, y:1 },
+      { id:'brute',  x:0, y:0 },
+      { id:'varek',  x:4, y:1 },
+      { id:'sister', x:5, y:0 },
+    ],
+  },
+
+  // act2_side1 — The Ley Scar (8×8)
+  act2_side1: {
+    label: 'The Ley Scar',
+    cols: 8, rows: 8,
+    obstacle: [
+      '3,3','4,3','3,4','4,4',
+    ],
+    high: [
+      '0,0','1,0','6,0','7,0',
+      '0,7','1,7','6,7','7,7',
+      '2,2','5,2','2,5','5,5',
+    ],
+    water: [
+      '2,3','2,4',
+      '5,3','5,4',
+      '3,1','4,1',
+      '3,6','4,6',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:6 },
+      { id:'lyra',   x:1, y:7 },
+      { id:'kael',   x:0, y:7 },
+      { id:'zara',   x:1, y:6 },
+      { id:'rynn',   x:2, y:7 },
+    ],
+    enemyStart: [
+      { id:'solen',   x:4, y:0 },
+      { id:'grunt',   x:3, y:0 },
+      { id:'grunt_b', x:5, y:1 },
+      { id:'sister',  x:4, y:1 },
+    ],
+  },
+
+  // act2_m4 — Thornback Ridge (10×8)
+  act2_m4: {
+    label: 'Thornback Ridge',
+    cols: 10, rows: 8,
+    obstacle: [
+      '2,1','2,6',
+      '4,2','4,5',
+      '6,1','6,2','6,5','6,6',
+      '7,3','8,3',
+    ],
+    high: [
+      '5,3','5,4',
+      '7,0','8,0','9,0',
+      '7,7','8,7','9,7',
+      '7,1','7,2','7,5','7,6',
+      '8,2','8,5','9,2','9,5',
+    ],
+    water: [
+      '0,3','0,4','1,3','1,4',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:0, y:2 },
+      { id:'lyra',   x:0, y:5 },
+      { id:'kael',   x:1, y:2 },
+      { id:'zara',   x:0, y:3 },
+      { id:'rynn',   x:1, y:5 },
+    ],
+    enemyStart: [
+      { id:'varek',  x:8, y:3 },
+      { id:'solen',  x:9, y:2 },
+      { id:'grunt',  x:7, y:1 },
+      { id:'brute',  x:7, y:6 },
+      { id:'sister', x:9, y:5 },
+    ],
+  },
+
+  // act2_m5 — The Relay Station (8×8)
+  act2_m5: {
+    label: 'The Relay Station',
+    cols: 8, rows: 8,
+    obstacle: [
+      '1,1','6,1',
+      '0,2','7,2',
+      '2,2','5,2',
+      '2,5','5,5',
+      '0,5','7,5',
+    ],
+    high: [
+      '3,2','4,2',
+      '3,3','4,3',
+      '3,4','4,4',
+      '2,1','5,1',
+    ],
+    water: [
+      '1,3','1,4',
+      '6,3','6,4',
+    ],
+    hazard: [],
+    playerStart: [
+      { id:'aldric', x:2, y:7 },
+      { id:'lyra',   x:3, y:7 },
+      { id:'kael',   x:4, y:7 },
+      { id:'zara',   x:5, y:7 },
+      { id:'rynn',   x:1, y:6 },
+    ],
+    enemyStart: [
+      { id:'solen',   x:3, y:1 },
+      { id:'varek',   x:4, y:2 },
+      { id:'grunt',   x:2, y:3 },
+      { id:'brute',   x:5, y:3 },
+      { id:'sister',  x:3, y:0 },
+      { id:'grunt_b', x:5, y:0 },
+    ],
+  },
 };
 
 // Base unit templates — positions overridden per map
 const BASE_UNITS = [
+  // ── Player characters ──────────────────────────────────────
   createUnit({ id:'aldric',     name:'Aldric',    job:'Knight',     hp:140,maxHp:140, mp:20, maxMp:20,  speed:3, attack:16, defense:16, moveRange:3, x:1,y:5, team:'player', abilities:['Attack','Shield Bash','Wait'] }),
   createUnit({ id:'lyra',       name:'Lyra',      job:'Mage',       hp:65, maxHp:65,  mp:90, maxMp:90,  speed:8, attack:24, defense:5,  moveRange:4, x:2,y:6, team:'player', abilities:['Attack','Fireball','Heal','Wait'] }),
   createUnit({ id:'kael',       name:'Kael',      job:'Paladin',    hp:120,maxHp:120, mp:60, maxMp:60,  speed:4, attack:14, defense:18, moveRange:3, x:0,y:6, team:'player', abilities:['Attack','Holy Lance','Barrier','Wait'] }),
   createUnit({ id:'zara',       name:'Zara',      job:'Thief',      hp:80, maxHp:80,  mp:40, maxMp:40,  speed:9, attack:14, defense:6,  moveRange:5, x:1,y:6, team:'player', abilities:['Attack','Steal Mana','Smoke Bomb','Wait'] }),
+  // Act 2 recruits
+  createUnit({ id:'rynn',       name:'Rynn',      job:'Scout',      hp:72, maxHp:72,  mp:40, maxMp:40,  speed:10, attack:13, defense:6,  moveRange:5, x:0,y:0, team:'player', abilities:['Attack','Scout Shot','Vanish','Wait'] }),
+  createUnit({ id:'eska',       name:'Eska',      job:'Warden',     hp:78, maxHp:78,  mp:70, maxMp:70,  speed:6,  attack:11, defense:10, moveRange:3, x:0,y:0, team:'player', abilities:['Attack','Root','Ley Pulse','Wait'] }),
+  // ── Enemy characters ───────────────────────────────────────
   createUnit({ id:'grunt',      name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:5,y:2, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
   createUnit({ id:'darkwraith', name:'Darkwraith',job:'Dark Knight',hp:115,maxHp:115, mp:50, maxMp:50,  speed:4, attack:22, defense:12, moveRange:2, x:6,y:1, team:'enemy',  abilities:['Attack','Dark Wave','Wait'] }),
   createUnit({ id:'brute',      name:'Brute',     job:'Berserker',  hp:130,maxHp:130, mp:0,  maxMp:0,   speed:5, attack:28, defense:7,  moveRange:3, x:4,y:1, team:'enemy',  abilities:['Attack','Rampage','Wait'] }),
   createUnit({ id:'sister',     name:'Sister',    job:'Healer',     hp:75, maxHp:75,  mp:100,maxMp:100, speed:7, attack:8,  defense:8,  moveRange:4, x:7,y:0, team:'enemy',  abilities:['Attack','Mend','Revive','Wait'] }),
+  // Act 2 enemies
+  createUnit({ id:'varek',      name:'Varek',     job:'Commander',  hp:145,maxHp:145, mp:30, maxMp:30,  speed:4, attack:20, defense:15, moveRange:3, x:0,y:0, team:'enemy',  abilities:['Attack','Rally','Shield Wall','Wait'] }),
+  createUnit({ id:'solen',      name:'Solen',     job:'Arcanist',   hp:68, maxHp:68,  mp:110,maxMp:110, speed:7, attack:22, defense:6,  moveRange:4, x:0,y:0, team:'enemy',  abilities:['Attack','Fireball','Suppress','Wait'] }),
+  createUnit({ id:'grunt_b',    name:'Grunt',     job:'Archer',     hp:85, maxHp:85,  mp:20, maxMp:20,  speed:6, attack:15, defense:8,  moveRange:3, x:0,y:0, team:'enemy',  abilities:['Attack','Arrow Shot','Wait'] }),
 ];
 // --- SECTION: Map System ---
 const MapSystem = (() => {
@@ -629,6 +797,7 @@ const MapSystem = (() => {
     const obs = new Set(def.obstacle || []);
     const hi  = new Set(def.high     || []);
     const wat = new Set(def.water    || []);
+    const haz = new Set(def.hazard   || []);
     const map = [];
     for(let r=0;r<def.rows;r++){
       map[r]=[];
@@ -638,6 +807,7 @@ const MapSystem = (() => {
         if(obs.has(k)){ terrain='obstacle'; elevation=2; }
         else if(hi.has(k)){ terrain='high'; elevation=1; }
         else if(wat.has(k)){ terrain='water'; elevation=-1; }
+        else if(haz.has(k)){ terrain='hazard'; elevation=0; }
         map[r][c]=Object.assign({},TileSchema,{x:c,y:r,terrain,elevation,occupied:false});
       }
     }
@@ -743,6 +913,25 @@ const TurnSystem = (() => {
     GameState._skipCurrentTurn=false;
     const unit=getUnit(nextId);
     if(unit){ StatusSystem.tick(unit); }
+    // Hazard damage — unit takes damage if standing on a hazard tile
+    if(unit && unit.hp > 0){
+      const tile = GameState.map[unit.y] && GameState.map[unit.y][unit.x];
+      if(tile && tile.terrain === 'hazard'){
+        const hazardDmg = 8;
+        unit.hp = Math.max(0, unit.hp - hazardDmg);
+        GameEvents.emit('unit:damaged', { unit, damage: hazardDmg, attackerId: 'hazard' });
+        GameState.floatingTexts.push({
+          x: unit.x, y: unit.y,
+          text: `\uD83D\uDD25${hazardDmg}`,
+          color: '#ff6600',
+          age: 0, maxAge: 30
+        });
+        if(unit.hp <= 0){
+          GameState.map[unit.y][unit.x].occupied = false;
+          GameEvents.emit('unit:defeated', { unit, attackerId: 'hazard' });
+        }
+      }
+    }
     if(checkBattleEnd())return;
     const fresh=getUnit(nextId);
     if(!fresh||fresh.hp<=0){ advanceTurn(); return; }
@@ -769,7 +958,6 @@ const TurnSystem = (() => {
   }
   return { start, advanceTurn, endTurn, buildQueue, checkBattleEnd };
 })();
-
 // --- SECTION: Movement System ---
 const MovementSystem = (() => {
   function getReachableTiles(unit){
@@ -977,8 +1165,9 @@ const WaterAnim = {
   },
   check() {
     const hasWater = GameState.map.some(row => row.some(t => t.terrain === 'water'));
-    if (hasWater && !this.active) this.start();
-    else if (!hasWater && this.active) this.stop();
+    const hasHazard = GameState.map.some(row => row.some(t => t.terrain === 'hazard'));
+    if ((hasWater || hasHazard) && !this.active) this.start();
+    else if (!hasWater && !hasHazard && this.active) this.stop();
   },
 };
 
@@ -1162,6 +1351,48 @@ function drawTerrainObstacle(ctx, tile, px, py, ts) {
   ctx.restore();
 }
 
+function drawTerrainHazard(ctx, tile, px, py, ts) {
+  const phase = WaterAnim.phase;
+
+  // Dark base
+  ctx.fillStyle = CONFIG.COLORS.TILE_HAZARD;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Animated fire shimmer
+  const alpha1 = 0.18 + 0.10 * Math.sin(phase * 1.3 + tile.x * 0.7);
+  ctx.fillStyle = `rgba(255,80,0,${alpha1.toFixed(3)})`;
+  ctx.fillRect(px, py, ts, ts);
+
+  // Fire flicker lines
+  ctx.save();
+  ctx.rect(px, py, ts, ts);
+  ctx.clip();
+  for(let fi = 0; fi < 3; fi++){
+    const fPhase = phase * 1.8 + fi * 1.2 + tile.x * 0.4 + tile.y * 0.3;
+    const fy = py + ts * (0.5 + fi * 0.18) - Math.abs(Math.sin(fPhase)) * ts * 0.3;
+    const falpha = 0.2 + 0.12 * Math.sin(phase * 1.1 + fi);
+    ctx.strokeStyle = `rgba(255,160,40,${falpha.toFixed(3)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px + ts * 0.2, fy + ts * 0.1);
+    ctx.bezierCurveTo(
+      px + ts * 0.35, fy - ts * 0.08 * Math.sin(fPhase),
+      px + ts * 0.65, fy + ts * 0.08 * Math.sin(fPhase * 0.9),
+      px + ts * 0.8, fy + ts * 0.1
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Top glow
+  const glintA = Math.max(0, 0.4 * Math.sin(phase * 2.4 + tile.x * 1.1 + tile.y * 0.6));
+  if(glintA > 0.08){
+    ctx.fillStyle = `rgba(255,200,60,${(glintA * 0.6).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px + ts * 0.5, py + ts * 0.25, ts * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 // --- SECTION: VFX System ---
 const VFXSystem = (() => {
   // Each VFX entry: { type, startTime, duration, ...params }
@@ -1392,11 +1623,10 @@ const VFXSystem = (() => {
 // --- SECTION: Renderer ---
 const Renderer = (() => {
   let _canvas=null,_ctx=null,_ts=CONFIG.TILE_SIZE;
-  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡'};
+  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡','Scout':'◎','Warden':'✦','Commander':'!','Arcanist':'✦'};
 
   function init(canvas){
     _canvas=canvas; _ctx=canvas.getContext('2d');
-    // Fit canvas to available space between header and footer
     const container = document.getElementById('canvas-container');
     const cw = container.clientWidth;
     const ch = container.clientHeight;
@@ -1405,43 +1635,39 @@ const Renderer = (() => {
     _canvas.width  = _ts * CONFIG.GRID_COLS;
     _canvas.height = _ts * CONFIG.GRID_ROWS;
     _ctx.imageSmoothingEnabled = false;
-    // Invalidate grain cache on resize
     _grainPattern = null;
     _grainTs = 0;
     return _ts;
   }
 
   function getTileColor(tile){
-    return {normal:CONFIG.COLORS.TILE_NORMAL,high:CONFIG.COLORS.TILE_HIGH,obstacle:CONFIG.COLORS.TILE_OBSTACLE,water:CONFIG.COLORS.TILE_WATER}[tile.terrain]||CONFIG.COLORS.TILE_NORMAL;
+    return {normal:CONFIG.COLORS.TILE_NORMAL,high:CONFIG.COLORS.TILE_HIGH,obstacle:CONFIG.COLORS.TILE_OBSTACLE,water:CONFIG.COLORS.TILE_WATER,hazard:CONFIG.COLORS.TILE_HAZARD}[tile.terrain]||CONFIG.COLORS.TILE_NORMAL;
   }
 
   function drawTile(tile){
     const {x,y}=tile, px=x*_ts, py=y*_ts, ts=_ts, ctx=_ctx;
 
-    // --- Polished terrain drawing ---
     switch (tile.terrain) {
       case 'normal':   drawTerrainNormal(ctx, tile, px, py, ts);   break;
       case 'high':     drawTerrainHigh(ctx, tile, px, py, ts);     break;
       case 'water':    drawTerrainWater(ctx, tile, px, py, ts);    break;
       case 'obstacle': drawTerrainObstacle(ctx, tile, px, py, ts); break;
+      case 'hazard':   drawTerrainHazard(ctx, tile, px, py, ts);   break;
       default:
         ctx.fillStyle = getTileColor(tile);
         ctx.fillRect(px, py, ts, ts);
     }
 
-    // Hover highlight
     if(GameState.hoveredTile&&GameState.hoveredTile.x===x&&GameState.hoveredTile.y===y&&tile.terrain!=='obstacle'&&tile.terrain!=='water'){
       ctx.fillStyle=CONFIG.COLORS.TILE_HOVER; ctx.fillRect(px,py,ts,ts);
     }
 
-    // Move range highlight
     if(GameState.validMoveTiles.some(t=>t.x===x&&t.y===y)){
       ctx.fillStyle=CONFIG.COLORS.TILE_HIGHLIGHT; ctx.fillRect(px,py,ts,ts);
       ctx.strokeStyle='rgba(80,200,255,0.75)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
       ctx.strokeRect(px+2,py+2,ts-4,ts-4); ctx.setLineDash([]);
     }
 
-    // Target highlight
     if(GameState.validTargetTiles.some(t=>t.x===x&&t.y===y)){
       const isHeal=GameState.pendingAbility&&ABILITIES[GameState.pendingAbility]&&ABILITIES[GameState.pendingAbility].type==='heal';
       ctx.fillStyle=isHeal?CONFIG.COLORS.TILE_HEAL_TARGET:CONFIG.COLORS.TILE_TARGET; ctx.fillRect(px,py,ts,ts);
@@ -1449,10 +1675,8 @@ const Renderer = (() => {
       ctx.strokeRect(px+2,py+2,ts-4,ts-4); ctx.setLineDash([]);
     }
 
-    // Grid line
     ctx.strokeStyle=CONFIG.COLORS.TILE_BORDER; ctx.lineWidth=0.5; ctx.strokeRect(px,py,ts,ts);
 
-    // Elevation badge — tile-relative font
     if(tile.elevation!==0){
       const elFs = Math.max(7, Math.floor(ts * 0.15));
       ctx.font=`${elFs}px monospace`; ctx.fillStyle='rgba(180,200,220,0.38)';
@@ -1469,7 +1693,6 @@ const Renderer = (() => {
     const accent=CONFIG.COLORS.JOB_ACCENT[unit.job]||'#90caf9';
     const job=unit.job;
 
-    // Selection ring
     if(isSel){
       ctx.save();
       ctx.shadowColor=CONFIG.COLORS.TILE_SELECTED;
@@ -1480,7 +1703,6 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    // Active-turn dashed ring
     if(isAct){
       ctx.save();
       ctx.strokeStyle=CONFIG.COLORS.TURN_INDICATOR;
@@ -1490,14 +1712,11 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    // Drop shadow ellipse
     ctx.beginPath();
     ctx.ellipse(cx,py+ts-5,rad*0.75,rad*0.22,0,0,Math.PI*2);
     ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
 
-    // ── Job-specific shape decorations (drawn before body) ──────
-    if(job==='Dark Knight'||job==='Berserker'){
-      // Jagged angular accent marks around circle
+    if(job==='Dark Knight'||job==='Berserker'||job==='Commander'){
       ctx.save();
       const spikes=6;
       const spikeOuter=rad+ts*0.13, spikeInner=rad+ts*0.04;
@@ -1518,8 +1737,7 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    if(job==='Archer'||job==='Thief'){
-      // Sharp outer ring (thinner, agile feel)
+    if(job==='Archer'||job==='Thief'||job==='Scout'){
       ctx.save();
       ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
       ctx.setLineDash([2,2]);
@@ -1528,21 +1746,17 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    // Unit body — gradient fill using team color
-    const effectiveRad = (job==='Archer'||job==='Thief') ? rad*0.92 : rad;
+    const effectiveRad = (job==='Archer'||job==='Thief'||job==='Scout') ? rad*0.92 : rad;
     ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2);
     const g=ctx.createRadialGradient(cx-effectiveRad*0.3,cy-effectiveRad*0.3,effectiveRad*0.08,cx,cy,effectiveRad);
     g.addColorStop(0,isP?'#7bdcfc':'#f48880');
     g.addColorStop(1,isP?'#1565c0':'#b71c1c');
     ctx.fillStyle=g; ctx.fill();
 
-    // Job-specific border style
     if(job==='Knight'||job==='Paladin'){
-      // Thick solid border — defensive, sturdy
       ctx.strokeStyle=accent; ctx.lineWidth=isSel?3.5:2.8;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
-    } else if(job==='Mage'||job==='Healer'){
-      // Normal border + inner glow ring
+    } else if(job==='Mage'||job==='Healer'||job==='Warden'){
       ctx.strokeStyle=tc; ctx.lineWidth=isSel?2.5:1.5;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
       ctx.save();
@@ -1551,33 +1765,29 @@ const Renderer = (() => {
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad*0.68,0,Math.PI*2); ctx.stroke();
       ctx.restore();
     } else {
-      // Default border using accent
       ctx.strokeStyle=accent; ctx.lineWidth=isSel?2.5:1.8;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
     }
 
-    // Job icon — tile-relative font
     const iconFs = Math.max(10, Math.floor(ts * 0.3));
     ctx.font=`bold ${iconFs}px serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillStyle='#fff'; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=4;
     ctx.fillText(ICON_CHARS[unit.job]||'*',cx,cy); ctx.shadowBlur=0;
 
-    // Status effect icons — tile-relative font
     if(unit.statusEffects&&unit.statusEffects.length>0){
-      const SI={poison:'☠',stun:'★',slow:'⧖',shield:'◉'};
+      const SI={poison:'☠',stun:'★',slow:'⧖',shield:'◉',rooted:'❧',suppressed:')',rallied:'!',hidden:'◎',ley_spent:'◈'};
       const seFs = Math.max(7, Math.floor(ts * 0.17));
       unit.statusEffects.forEach((se,i)=>{
         ctx.font=`${seFs}px serif`;
         ctx.textAlign='left'; ctx.textBaseline='top';
-        ctx.fillStyle=se.name==='poison'?'#a0ff60':se.name==='stun'?'#ffee00':'#80c8ff';
+        ctx.fillStyle=se.name==='poison'?'#a0ff60':se.name==='stun'?'#ffee00':se.name==='rallied'?'#ffd740':se.name==='hidden'?'#aaaaaa':'#80c8ff';
         ctx.shadowColor='#000'; ctx.shadowBlur=3;
         ctx.fillText(SI[se.name]||'?', px+2+i*Math.floor(ts*0.19), py+ts*0.42);
         ctx.shadowBlur=0;
       });
     }
 
-    // HP bar
     const bw=ts-8, bh=Math.max(4,Math.floor(ts*0.08));
     const bx=px+4, by=py+ts-bh-5;
     const hp=unit.hp/unit.maxHp;
@@ -1586,7 +1796,6 @@ const Renderer = (() => {
     ctx.fillRect(bx,by,Math.round(bw*hp),bh);
     ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
 
-    // Unit name — tile-relative font
     const nfs=Math.max(8, Math.floor(ts*0.135));
     ctx.font=`${nfs}px 'Courier New',monospace`;
     ctx.textAlign='center'; ctx.textBaseline='bottom';
@@ -1599,31 +1808,25 @@ const Renderer = (() => {
     const ctx=_ctx, cw=_canvas.width, ch=_canvas.height;
     const au=getUnit(GameState.currentTurn); if(!au)return;
 
-    // Compute font sizes relative to canvas width and tile size
     const uf = Math.max(8, Math.min(Math.floor(_ts*0.155), Math.floor(cw*0.022)));
     const ph = Math.max(22, Math.floor(_ts*0.38));
 
-    // ── Top strip ──────────────────────────────────────────────
-    // Background with subtle gradient
     const topGrad = ctx.createLinearGradient(0, 0, 0, ph);
     topGrad.addColorStop(0, 'rgba(4,8,18,0.98)');
     topGrad.addColorStop(1, 'rgba(8,16,28,0.94)');
     ctx.fillStyle = topGrad;
     ctx.fillRect(0, 0, cw, ph);
 
-    // Accent border line
     ctx.strokeStyle = CONFIG.COLORS.ACCENT;
     ctx.lineWidth = 0.8;
     ctx.strokeRect(0, 0, cw, ph);
 
-    // Bottom glow of top strip
     const grd = ctx.createLinearGradient(0, ph-2, 0, ph+3);
     grd.addColorStop(0, 'rgba(0,229,255,0.25)');
     grd.addColorStop(1, 'rgba(0,229,255,0)');
     ctx.fillStyle = grd;
     ctx.fillRect(0, ph-2, cw, 5);
 
-    // Round number badge
     const roundLabel = `R${(GameState.turnNumber||0)+1}`;
     const rndFs = Math.max(7, Math.floor(uf * 0.85));
     ctx.font = `bold ${rndFs}px 'Courier New',monospace`;
@@ -1638,7 +1841,6 @@ const Renderer = (() => {
     ctx.fillStyle = CONFIG.COLORS.ACCENT;
     ctx.fillText(roundLabel, rndX + rndW / 2, rndY + (rndFs + 4) / 2);
 
-    // Active unit info
     const tc = au.team==='player' ? CONFIG.COLORS.TEAM_PLAYER : CONFIG.COLORS.TEAM_ENEMY;
     const infoX = rndX + rndW + 6;
 
@@ -1656,8 +1858,6 @@ const Renderer = (() => {
     ctx.font = `${Math.max(7, Math.floor(uf * 0.85))}px 'Courier New',monospace`;
     ctx.fillText(`(${au.job})`, infoX + arrowW + nameW, ph / 2);
 
-    // Turn queue preview — right side
-    // Show up to 4 upcoming units
     const qp = [GameState.currentTurn, ...GameState.turnQueue].slice(0, 5);
     let qx = cw - 4;
     ctx.font = `${Math.max(7, Math.floor(uf * 0.88))}px 'Courier New',monospace`;
@@ -1666,7 +1866,6 @@ const Renderer = (() => {
       const u = getUnit(qp[i]); if (!u) continue;
       const qc = u.team==='player' ? CONFIG.COLORS.TEAM_PLAYER : CONFIG.COLORS.TEAM_ENEMY;
       ctx.font = `${i===0 ? 'bold ' : ''}${Math.max(7, Math.floor(uf*(i===0?1:0.85)))}px 'Courier New',monospace`;
-      // Pulse the active unit name in the queue
       if(i===0){
         const pulse = 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(Date.now() * 0.005));
         ctx.globalAlpha = pulse;
@@ -1686,20 +1885,17 @@ const Renderer = (() => {
       }
     }
 
-    // ── Bottom strip (selected unit detail) ────────────────────
     const sel = getUnit(GameState.selectedUnit);
     if (sel && !GameState.showActionMenu) {
       const dh = Math.max(36, Math.floor(_ts * 0.58));
       const dy = ch - dh;
 
-      // Background gradient
       const botGrad = ctx.createLinearGradient(0, dy, 0, ch);
       botGrad.addColorStop(0, 'rgba(8,16,28,0.94)');
       botGrad.addColorStop(1, 'rgba(4,8,18,0.98)');
       ctx.fillStyle = botGrad;
       ctx.fillRect(0, dy, cw, dh);
 
-      // Top glow line
       const glowGrd = ctx.createLinearGradient(0, dy-3, 0, dy+2);
       glowGrd.addColorStop(0, 'rgba(0,229,255,0)');
       glowGrd.addColorStop(1, 'rgba(0,229,255,0.22)');
@@ -1711,7 +1907,6 @@ const Renderer = (() => {
       ctx.lineWidth = 0.8;
       ctx.strokeRect(0, dy, cw, dh);
 
-      // Name + job
       const bUf = Math.max(8, Math.floor(uf * 1.05));
       ctx.font = `bold ${bUf}px 'Courier New',monospace`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -1723,19 +1918,16 @@ const Renderer = (() => {
       ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
       ctx.fillText(`· ${sel.job}`, 8 + snw, dy + 6);
 
-      // Stats row
       const suf = Math.max(7, Math.floor(uf * 0.82));
       ctx.font = `${suf}px 'Courier New',monospace`;
       ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
       ctx.textBaseline = 'bottom';
       ctx.fillText(`ATK:${sel.attack}  DEF:${sel.defense}  MOV:${sel.moveRange}  SPD:${sel.speed}`, 8, dy + dh - 4);
 
-      // Abilities list (right side)
       ctx.font = `${Math.max(7, Math.floor(suf * 0.9))}px 'Courier New',monospace`;
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = CONFIG.COLORS.ACCENT;
       const abText = sel.abilities.join(' · ');
-      // Truncate if too wide
       const maxAbW = cw * 0.45;
       let abDisplay = abText;
       while (ctx.measureText(abDisplay).width > maxAbW && abDisplay.length > 3) {
@@ -1744,13 +1936,11 @@ const Renderer = (() => {
       }
       ctx.fillText(abDisplay, cw - 6, dy + dh - 4);
 
-      // ── Mini HP and MP bars ──────────────────────────────────
       const barW = Math.min(cw * 0.28, 110);
       const barH = Math.max(5, Math.floor(dh * 0.14));
       const barX = 8;
       const midY = dy + dh * 0.5;
 
-      // HP bar
       const hpRatio = sel.hp / sel.maxHp;
       ctx.fillStyle = CONFIG.COLORS.HP_BAR_BG;
       ctx.fillRect(barX, midY - barH - 2, barW, barH);
@@ -1758,19 +1948,15 @@ const Renderer = (() => {
       ctx.fillRect(barX, midY - barH - 2, Math.round(barW * hpRatio), barH);
       ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5;
       ctx.strokeRect(barX, midY - barH - 2, barW, barH);
-      // HP label
       const barLabelFs = Math.max(7, Math.floor(barH * 1.1));
       ctx.font = `${barLabelFs}px 'Courier New',monospace`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#4caf50';
       ctx.fillText(`HP`, barX, midY - barH * 0.5 - 2 - barH - 1);
-
-      // HP numbers right of bar
       ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
       ctx.textAlign = 'left';
       ctx.fillText(`${sel.hp}/${sel.maxHp}`, barX + barW + 4, midY - barH - 2 + barH / 2);
 
-      // MP bar
       const mpRatio = sel.maxMp > 0 ? sel.mp / sel.maxMp : 0;
       ctx.fillStyle = CONFIG.COLORS.HP_BAR_BG;
       ctx.fillRect(barX, midY + 2, barW, barH);
@@ -1778,11 +1964,8 @@ const Renderer = (() => {
       ctx.fillRect(barX, midY + 2, Math.round(barW * mpRatio), barH);
       ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5;
       ctx.strokeRect(barX, midY + 2, barW, barH);
-      // MP label
       ctx.fillStyle = '#2196f3';
       ctx.fillText(`MP`, barX, midY + 2 + barH / 2 - barH - 1);
-
-      // MP numbers
       ctx.fillStyle = CONFIG.COLORS.TEXT_DIM;
       ctx.textAlign = 'left';
       ctx.fillText(`${sel.mp}/${sel.maxMp}`, barX + barW + 4, midY + 2 + barH / 2);
@@ -1810,7 +1993,6 @@ const Renderer = (() => {
     _ctx.clearRect(0,0,_canvas.width,_canvas.height);
     for(let r=0;r<CONFIG.GRID_ROWS;r++) for(let c=0;c<CONFIG.GRID_COLS;c++) drawTile(GameState.map[r][c]);
 
-    // Selected unit tile highlight
     if(GameState.selectedUnit){
       const su=getUnit(GameState.selectedUnit);
       if(su){ _ctx.fillStyle=CONFIG.COLORS.TILE_SELECTED; _ctx.fillRect(su.x*_ts,su.y*_ts,_ts,_ts); }
@@ -1826,7 +2008,6 @@ const Renderer = (() => {
   function getTileSize(){ return _ts; }
   return { init, draw, getTileSize };
 })();
-
 // --- SECTION: Utility Helpers ---
 function getUnit(id){ return GameState.units.find(u=>u.id===id)||null; }
 function getUnitAt(x,y){ return GameState.units.find(u=>u.x===x&&u.y===y&&u.hp>0)||null; }
@@ -1995,8 +2176,30 @@ const ABILITIES = {
   'Rampage':    { id:'Rampage',    name:'Rampage',    icon:'⚡', power:14, mpCost:0,  range:1, targetType:'any',   type:'damage',    aoe:true,
     aoeTiles:(tx,ty,caster)=>{ const t=[]; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy}); return t; },
     statusEffect:null, statusChance:0, pushBack:false, description:'Strike all surrounding tiles.' },
-};
 
+  // ── Act 2 abilities ────────────────────────────────────────
+  'Scout Shot': { id:'Scout Shot', name:'Scout Shot', icon:'~', power:10, mpCost:8,  range:3, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:'slow', statusChance:1.0, pushBack:false, description:'Ranged shot. Always slows target. 8 MP.' },
+
+  'Vanish':     { id:'Vanish',     name:'Vanish',     icon:'◎', power:0,  mpCost:14, range:0, targetType:'self',  type:'buff',   aoe:false, aoeTiles:null, statusEffect:'hidden', statusChance:1.0, pushBack:false, description:'Become untargetable by enemies for 1 turn. 14 MP.' },
+
+  'Root':       { id:'Root',       name:'Root',       icon:'❧', power:0,  mpCost:10, range:2, targetType:'enemy', type:'root',   aoe:false, aoeTiles:null, statusEffect:'rooted', statusChance:1.0, pushBack:false, description:'Immobilize target for 2 turns. 10 MP.' },
+
+  'Ley Pulse':  { id:'Ley Pulse',  name:'Ley Pulse',  icon:'◈', power:12, mpCost:0,  range:1, targetType:'any',   type:'damage', aoe:true,
+    aoeTiles:(tx,ty,caster)=>{
+      const t=[];
+      for(let dy=-1;dy<=1;dy++)
+        for(let dx=-1;dx<=1;dx++)
+          if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy});
+      return t;
+    },
+    statusEffect:null, statusChance:0, pushBack:false, description:'AoE pulse around caster. Free once per battle.' },
+
+  'Rally':      { id:'Rally',      name:'Rally',      icon:'!', power:0,  mpCost:12, range:0, targetType:'self',  type:'rally',  aoe:false, aoeTiles:null, statusEffect:'rallied', statusChance:1.0, pushBack:false, description:'Boost adjacent allies attack for 2 turns. 12 MP.' },
+
+  'Shield Wall':{ id:'Shield Wall',name:'Shield Wall',icon:'◉', power:0,  mpCost:18, range:0, targetType:'self',  type:'shield_wall', aoe:false, aoeTiles:null, statusEffect:'shield', statusChance:1.0, pushBack:false, description:'Grant shield to self and adjacent allies. 18 MP.' },
+
+  'Suppress':   { id:'Suppress',   name:'Suppress',   icon:')', power:0,  mpCost:20, range:3, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:1.0, pushBack:false, description:'Silence target for 2 turns. Cannot use abilities. 20 MP.' },
+};
 // --- SECTION: Combat Math ---
 const CombatMath = {
   calcDamage(attacker, defender, ability){
@@ -2036,12 +2239,28 @@ const StatusSystem = {
         se._originalSpeed = unit.speed;
         unit.speed = Math.floor(unit.speed / 2);
         se._applied = true;
+      } else if(se.name === 'rooted' && !se._applied){
+        se._originalMoveRange = unit.moveRange;
+        unit.moveRange = 0;
+        se._applied = true;
+      } else if(se.name === 'suppressed' && !se._applied){
+        se._suppressed = true;
+      } else if(se.name === 'rallied' && !se._applied){
+        se._originalAttack = unit.attack;
+        unit.attack += 3;
+        se._applied = true;
       }
+      // hidden: no tick behavior — handled by AI target selection
+      // ley_spent: persists, no tick behavior needed
       se.turnsLeft--;
       if(se.turnsLeft <= 0){
         expired.push(se);
         if(se.name === 'slow' && se._applied && se._originalSpeed !== undefined)
           unit.speed = se._originalSpeed;
+        if(se.name === 'rooted' && se._applied && se._originalMoveRange !== undefined)
+          unit.moveRange = se._originalMoveRange;
+        if(se.name === 'rallied' && se._applied && se._originalAttack !== undefined)
+          unit.attack = se._originalAttack;
       }
     }
     unit.statusEffects = unit.statusEffects.filter(se => !expired.includes(se));
@@ -2050,10 +2269,15 @@ const StatusSystem = {
     if(wasStunned) GameState._skipCurrentTurn = true;
   },
 };
-
 // --- SECTION: Ability System ---
 const AbilitySystem = {
-  getAbilities(unit){ return (unit.abilities||[]).map(id=>ABILITIES[id]).filter(Boolean); },
+  getAbilities(unit){
+    const suppressed = unit.statusEffects.some(se => se.name === 'suppressed');
+    return (unit.abilities||[])
+      .map(id => ABILITIES[id])
+      .filter(Boolean)
+      .filter(ab => !suppressed || ab.id === 'Attack' || ab.id === 'Wait');
+  },
   canUse(unit, abilityId){
     const ab = ABILITIES[abilityId]; if(!ab)return false;
     if(ab.type==='wait')return true;
@@ -2063,6 +2287,8 @@ const AbilitySystem = {
     const ab = ABILITIES[abilityId]; if(!ab||ab.type==='wait')return [];
     // Smoke Bomb: self-cast, no tile targeting needed — return caster tile
     if(ab.type === 'smoke') return [{x:actingUnit.x, y:actingUnit.y}];
+    // Rally, Shield Wall, Vanish: self-cast
+    if(ab.type === 'rally' || ab.type === 'shield_wall' || (ab.type === 'buff' && ab.id === 'Vanish')) return [{x:actingUnit.x, y:actingUnit.y}];
     const targets = [];
     for(let row=0;row<CONFIG.GRID_ROWS;row++){
       for(let col=0;col<CONFIG.GRID_COLS;col++){
@@ -2072,12 +2298,14 @@ const AbilitySystem = {
         const tile = GameState.map[row][col];
         if(!tile) continue;
         if(ab.type === 'revive'){
-          // Target fallen allies (hp === 0)
           const fallen = GameState.units.find(u => u.x===col && u.y===row && u.hp===0 && u.team===actingUnit.team);
           if(fallen) targets.push({x:col,y:row});
         } else if(ab.type === 'buff' || ab.type === 'heal' || ab.targetType === 'ally'){
           const u = getUnitAt(col, row);
           if(u && u.team === actingUnit.team) targets.push({x:col,y:row});
+        } else if(ab.type === 'root' || ab.type === 'suppress'){
+          const u = getUnitAt(col, row);
+          if(u && u.team !== actingUnit.team) targets.push({x:col,y:row});
         } else {
           if(ab.aoe){
             if(tile.terrain !== 'obstacle') targets.push({x:col,y:row});
@@ -2097,6 +2325,15 @@ const AbilitySystem = {
       GameState.floatingTexts.push({x:actingUnit.x,y:actingUnit.y,text:'NO MP!',color:'#6090ff',age:0,maxAge:30});
       Renderer.draw(); return;
     }
+    // Ley Pulse — once per battle
+    if(abilityId === 'Ley Pulse'){
+      const alreadyUsed = actingUnit.statusEffects.find(se => se.name === 'ley_spent');
+      if(alreadyUsed){
+        GameState.floatingTexts.push({x:actingUnit.x,y:actingUnit.y,text:'SPENT',color:'#6090ff',age:0,maxAge:30});
+        Renderer.draw(); return;
+      }
+      StatusSystem.apply(actingUnit, 'ley_spent', 999);
+    }
     actingUnit.mp = Math.max(0, actingUnit.mp - ab.mpCost);
     GameEvents.emit('ability:used', { unit:actingUnit, abilityId, targetX, targetY });
     // --- Smoke Bomb: hits nearby enemies by distance, not tile loop ---
@@ -2115,6 +2352,42 @@ const AbilitySystem = {
       setTimeout(()=>TurnSystem.endTurn(), 400);
       return;
     }
+    // --- Rally: buff self + adjacent allies ---
+    if(ab.type === 'rally'){
+      StatusSystem.apply(actingUnit, 'rallied', 2);
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      for(const [dx,dy] of dirs){
+        const nx = actingUnit.x+dx, ny = actingUnit.y+dy;
+        if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS) continue;
+        const ally = getUnitAt(nx, ny);
+        if(ally && ally.team === actingUnit.team && ally.id !== actingUnit.id){
+          StatusSystem.apply(ally, 'rallied', 2);
+        }
+      }
+      GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(), 400);
+      return;
+    }
+    // --- Shield Wall: shield self + adjacent allies ---
+    if(ab.type === 'shield_wall'){
+      StatusSystem.apply(actingUnit, 'shield', 1);
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      for(const [dx,dy] of dirs){
+        const nx = actingUnit.x+dx, ny = actingUnit.y+dy;
+        if(nx<0||ny<0||nx>=CONFIG.GRID_COLS||ny>=CONFIG.GRID_ROWS) continue;
+        const ally = getUnitAt(nx, ny);
+        if(ally && ally.team === actingUnit.team && ally.id !== actingUnit.id){
+          StatusSystem.apply(ally, 'shield', 1);
+        }
+      }
+      GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
+      GameState.pendingAbility=null; GameState.validTargetTiles=[]; GameState.selectedUnit=null;
+      Renderer.draw();
+      setTimeout(()=>TurnSystem.endTurn(), 400);
+      return;
+    }
     let affectedTiles = [{x:targetX,y:targetY}];
     if(ab.aoe && ab.aoeTiles) affectedTiles = ab.aoeTiles(targetX, targetY, actingUnit);
     for(const tile of affectedTiles){
@@ -2124,7 +2397,6 @@ const AbilitySystem = {
         if(!tu||tu.id===actingUnit.id)continue;
         if(!ab.aoe && tu.team===actingUnit.team)continue;
         let dmg = CombatMath.calcDamage(actingUnit, tu, ab);
-        // Shield: halve damage and consume shield
         const shieldEffect = tu.statusEffects.find(se => se.name === 'shield');
         if(shieldEffect){
           dmg = Math.ceil(dmg * 0.5);
@@ -2180,8 +2452,25 @@ const AbilitySystem = {
           GameEvents.emit('unit:defeated', { unit:tu, attackerId:actingUnit.id });
         }
       } else if(ab.type === 'buff'){
-        if(!tu||tu.team!==actingUnit.team) continue;
-        StatusSystem.apply(tu, 'shield', 1);
+        if(!tu) continue;
+        // Vanish: self-buff (targetType:'self')
+        if(ab.id === 'Vanish'){
+          StatusSystem.apply(actingUnit, 'hidden', 1);
+        } else {
+          // Barrier: buff ally
+          if(tu.team !== actingUnit.team) continue;
+          if(ab.statusEffect){
+            StatusSystem.apply(tu, ab.statusEffect, 1);
+          } else {
+            StatusSystem.apply(tu, 'shield', 1);
+          }
+        }
+      } else if(ab.type === 'root'){
+        if(!tu || tu.team === actingUnit.team) continue;
+        StatusSystem.apply(tu, 'rooted', 2);
+      } else if(ab.type === 'suppress'){
+        if(!tu || tu.team === actingUnit.team) continue;
+        StatusSystem.apply(tu, 'suppressed', 2);
       }
     }
     GameState.unitActed=true; GameState.showActionMenu=false; GameState.actionMenuUnit=null;
@@ -2201,7 +2490,6 @@ const AbilitySystem = {
     GameState.map[ny][nx].occupied=true;
   },
 };
-
 // --- SECTION: Action Menu ---
 const ActionMenu = (() => {
   let _btns = [];
@@ -2368,7 +2656,11 @@ const AISystem = (() => {
   }
 
   function _selectTarget(unit) {
-    const players = GameState.units.filter(u => u.team === 'player' && u.hp > 0);
+    const players = GameState.units.filter(u =>
+      u.team === 'player' &&
+      u.hp > 0 &&
+      !u.statusEffects.some(se => se.name === 'hidden') // skip hidden units
+    );
     if (!players.length) return null;
     players.sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
@@ -2485,6 +2777,8 @@ const AISystem = (() => {
     'Thief':       { abilityPriority: ['Steal Mana', 'Smoke Bomb', 'Attack'], targetHighestMp: true },
     'Paladin':     { abilityPriority: ['Barrier', 'Holy Lance', 'Attack'], preferBarrierAllies: true },
     'Berserker':   { abilityPriority: ['Rampage', 'Attack'], alwaysChase: true },
+    'Commander':   { abilityPriority: ['Shield Wall', 'Rally', 'Attack'], alwaysChase: false },
+    'Arcanist':    { abilityPriority: ['Suppress', 'Fireball', 'Attack'], retreatIfAdjacent: true },
   };
 
   function _turnKnight(unit, target) {
@@ -2614,11 +2908,9 @@ const AISystem = (() => {
   }
 
   function _turnBerserker(unit, target) {
-    // Always charge nearest enemy, use Rampage if any enemy adjacent
     const enemies = GameState.units.filter(u => u.team !== unit.team && u.hp > 0);
     const adjacent = enemies.filter(e => _chebyshev(unit.x, unit.y, e.x, e.y) === 1);
     if (adjacent.length > 0) {
-      // Use Rampage centered on self (aoeTiles uses caster pos, target pos ignored)
       _attackPhase(unit, adjacent[0], 0);
     } else {
       _moveToward(unit, target.x, target.y);
@@ -2633,11 +2925,9 @@ const AISystem = (() => {
   }
 
   function _turnHealer(unit, target) {
-    // Prioritise healing lowest-HP ally, then attack
     const allies = GameState.units.filter(u => u.team === unit.team && u.hp > 0 && u.id !== unit.id);
     const wounded = allies.filter(a => a.hp < a.maxHp * 0.6)
       .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
-    // Try Revive first on fallen allies
     const fallen = GameState.units.filter(u => u.team === unit.team && u.hp === 0);
     for (const f of fallen) {
       if (_chebyshev(unit.x, unit.y, f.x, f.y) <= 1 && AbilitySystem.canUse(unit, 'Revive')) {
@@ -2645,14 +2935,12 @@ const AISystem = (() => {
         return;
       }
     }
-    // Try Mend on wounded ally in range
     for (const w of wounded) {
       if (_chebyshev(unit.x, unit.y, w.x, w.y) <= 2 && AbilitySystem.canUse(unit, 'Mend')) {
         setTimeout(() => AbilitySystem.execute(unit, 'Mend', w.x, w.y), 350);
         return;
       }
     }
-    // Move toward most wounded ally if out of range
     if (wounded.length > 0) {
       const moveTarget = wounded[0];
       const dist = _chebyshev(unit.x, unit.y, moveTarget.x, moveTarget.y);
@@ -2660,7 +2948,6 @@ const AISystem = (() => {
         _moveToward(unit, moveTarget.x, moveTarget.y);
         setTimeout(() => {
           const u = getUnit(unit.id); if (!u || u.hp <= 0) { TurnSystem.endTurn(); return; }
-          // Re-check after move
           const stillWounded = GameState.units.filter(a => a.team === u.team && a.hp > 0 && a.id !== u.id && a.hp < a.maxHp * 0.6)
             .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
           if (stillWounded.length > 0 && _chebyshev(u.x, u.y, stillWounded[0].x, stillWounded[0].y) <= 2 && AbilitySystem.canUse(u, 'Mend')) {
@@ -2672,7 +2959,6 @@ const AISystem = (() => {
         return;
       }
     }
-    // No healing needed — fallback to weak attack or wait
     const abilityId = _selectAbility(unit, target);
     if (abilityId && abilityId !== 'Mend' && abilityId !== 'Revive') {
       _attackPhase(unit, target, 0);
@@ -2697,13 +2983,14 @@ const AISystem = (() => {
       case 'Dark Knight': _turnDarkKnight(u, target);  break;
       case 'Berserker':   _turnBerserker(u, target);   break;
       case 'Healer':      _turnHealer(u, target);      break;
+      case 'Commander':   _turnDefault(u, target);     break;
+      case 'Arcanist':    _turnMage(u, target);        break;
       default:            _turnDefault(u, target);      break;
     }
   }
 
   return { doTurn, _selectTarget, _selectAbility, AGGRESSION_PROFILES };
 })();
-
 </script>
 <!-- ── Title Screen HTML ───────────────────────────────────── -->
 <div id="title-screen" style="
@@ -2839,6 +3126,7 @@ const AISystem = (() => {
 
 const WORLD_MAP_NODES = {
 
+  // ── Act 1 ──────────────────────────────────────────────────
   act1_m1: {
     id: 'act1_m1', label: 'Ruins of Aethermoor', act: 1, type: 'main',
     unlockCondition: null, connections: ['act1_m2'], mapId: 'map_1'
@@ -2872,6 +3160,48 @@ const WORLD_MAP_NODES = {
     id: 'act1_m6', label: 'The Shattered Keep', act: 1, type: 'main',
     unlockCondition: { type: 'map_completed', mapId: 'act1_m5' },
     connections: [], mapId: 'map_6'
+  },
+
+  // ── Act 2 ──────────────────────────────────────────────────
+  act2_m1: {
+    id: 'act2_m1', label: 'The Ashfen Wood', act: 2, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act1_m6' },
+    connections: ['act2_m2'], mapId: 'act2_m1'
+  },
+
+  act2_m2: {
+    id: 'act2_m2', label: 'Cinder Hollow', act: 2, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act2_m1' },
+    connections: ['act2_m3', 'act2_side1'], mapId: 'act2_m2'
+  },
+
+  act2_side1: {
+    id: 'act2_side1', label: 'The Ley Scar', act: 2, type: 'side',
+    unlockCondition: {
+      type: 'all_of', conditions: [
+        { type: 'map_completed', mapId: 'act2_m2' },
+        { type: 'flag', flag: 'heard_of_ley_scar' }
+      ]
+    },
+    connections: [], mapId: 'act2_side1'
+  },
+
+  act2_m3: {
+    id: 'act2_m3', label: 'The Sunken Road', act: 2, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act2_m2' },
+    connections: ['act2_m4'], mapId: 'act2_m3'
+  },
+
+  act2_m4: {
+    id: 'act2_m4', label: 'Thornback Ridge', act: 2, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act2_m3' },
+    connections: ['act2_m5'], mapId: 'act2_m4'
+  },
+
+  act2_m5: {
+    id: 'act2_m5', label: 'The Relay Station', act: 2, type: 'main',
+    unlockCondition: { type: 'map_completed', mapId: 'act2_m4' },
+    connections: [], mapId: 'act2_m5'
   },
 
 };
@@ -3824,65 +4154,51 @@ const CutsceneEngine = (() => {
 
 // =============================================================================
 // --- SECTION: Story Script ---
-// All narrative content for the game's three acts.
+// All narrative content for the game's acts.
 // =============================================================================
 const StoryScript = (() => {
 
   const INTRO = [
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "Three days since Ashfen sealed the perimeter. They're not soldiers — they're contractors. Someone paid well to make sure no one reaches the vault below these stones."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "The ley-lines are active — more than they should be after four centuries of dormancy. Whatever the Founders entombed here has been waking up. I can feel it through the stone. We need to reach the vault before they do."
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "Vault, power, destiny — fascinating. I'm more interested in whether we're getting paid when this is over. How many of them are between us and this door?"
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "Grunt's archers hold the outer courtyard. Darkwraith commands the inner gate. They're the vanguard — the real force is still further in. We cut through, we keep moving."
     },
     {
       speaker: 'Kael',
-      portrait: '†',
-      portraitColor: '#80cbc4',
-      glyph: '†',
-      bgTint: 'rgba(0,25,40,0.5)',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
       text: "I've broken through Ashfen lines before. They fight hard but they fight for coin, not conviction. Hold the formation and they'll crack. Lose it and they won't need to."
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "Right. Inspiring. Can we go now?"
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: Ruins of Aethermoor. Neutralize all enemy forces. The gate to the causeway lies beyond."
     },
   ];
@@ -3890,42 +4206,32 @@ const StoryScript = (() => {
   const MID = [
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "Grunt's dead. Darkwraith pulled back — wounded, not finished. They were the vanguard, Aldric. The main force is regrouping on the causeway."
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "Of course they are. Nothing about this job has been straightforward. What's a causeway look like when someone's had three days to dig in?"
     },
     {
       speaker: 'Kael',
-      portrait: '†',
-      portraitColor: '#80cbc4',
-      glyph: '†',
-      bgTint: 'rgba(0,25,40,0.5)',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
       text: "Narrow ground, water on the flanks, high ridges covering both exits. If they've placed archers on the ledges we'll be walking into a kill zone. We move fast or we don't move at all."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "Then we don't give them time to breathe. The vault isn't going to wait for us to get comfortable. Push through. Stay close."
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: Ashfen Causeway. Breach the enemy line. The passage into the ruins lies ahead."
     },
   ];
@@ -3933,66 +4239,50 @@ const StoryScript = (() => {
   const OUTRO = [
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,40,0.5)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,40,0.5)',
       text: "The keep is ours. All of them — down. We need thirty seconds to breathe and then we find that vault door."
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "Found it. But Aldric — this isn't a lock. These glyphs aren't mechanical. They're a warning, carved in seven different scripts over the top of each other. Someone came back to this door more than once to make sure you'd understand: do not open it."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.5)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.5)',
       text: "The ley-lines aren't radiating from the vault — they're flowing into it. Something in there is pulling energy from the entire region. It's been doing it for centuries. And it's not dormant. It is consuming, and it has been waiting for exactly this door to open."
     },
     {
       speaker: 'Kael',
-      portrait: '†',
-      portraitColor: '#80cbc4',
-      glyph: '†',
-      bgTint: 'rgba(0,25,40,0.5)',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
       text: "Then the real question is the one none of us want to say out loud. The Founders sealed this for a reason — better soldiers than us, with more knowledge than us, decided it had to stay closed. So do we open it?"
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "We came this far. I'd rather know what we're dealing with than spend the rest of my life wondering if someone else found it first."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.5)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.5)',
       text: "We open it. That's what we came here for. Stand ready — all of you."
     },
     {
       speaker: '— —',
-      portrait: '◈',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(10,0,30,0.9)',
+      portrait: '◈', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(10,0,30,0.9)',
       text: "The vault door splits open. Light — old light, the wrong color — pours into the keep. No one speaks. Everyone takes one step back. Except Aldric, who takes one step forward."
     },
     {
       speaker: '— ACT I COMPLETE —',
-      portrait: '◈',
-      portraitColor: 'var(--gold)',
-      glyph: '◈',
-      bgTint: 'rgba(0,0,0,0.92)',
+      portrait: '◈', portraitColor: 'var(--gold)',
+      glyph: '◈', bgTint: 'rgba(0,0,0,0.92)',
       text: "Aethermoor: Tactical Chronicles  ·  ·  ·  To Be Continued"
     },
   ];
@@ -4000,50 +4290,37 @@ const StoryScript = (() => {
   const DEFEAT_SCENE = [
     {
       speaker: 'Brute',
-      portrait: '⚡',
-      portraitColor: '#ff6f00',
-      glyph: '⚡',
-      bgTint: 'rgba(40,10,0,0.7)',
+      portrait: '⚡', portraitColor: '#ff6f00',
+      glyph: '⚡', bgTint: 'rgba(40,10,0,0.7)',
       text: "That's it? I've broken better than you before breakfast. Get up when you can — if you can."
     },
     {
       speaker: 'Sister',
-      portrait: '✚',
-      portraitColor: '#ff80ab',
-      glyph: '✚',
-      bgTint: 'rgba(30,0,20,0.6)',
+      portrait: '✚', portraitColor: '#ff80ab',
+      glyph: '✚', bgTint: 'rgba(30,0,20,0.6)',
       text: "Oh, don't be ashamed. You were overmatched from the moment you stepped into this field. I've seen it before — good fighters, wrong ground, wrong day. Rest now. I'll see to your wounds."
     },
     {
       speaker: 'Darkwraith',
-      portrait: '☽',
-      portraitColor: '#9e47ff',
-      glyph: '☽',
-      bgTint: 'rgba(20,0,40,0.7)',
+      portrait: '☽', portraitColor: '#9e47ff',
+      glyph: '☽', bgTint: 'rgba(20,0,40,0.7)',
       text: "You pushed far. Farther than most. But these grounds do not yield to the unprepared. Return when you are ready — if the dead will let you leave."
     },
   ];
 
-  // ── PRE_BATTLE_BANTER — short pre-fight exchanges, one per map (indices 0–3) ──
-  // Index 0: map_1, Index 1: map_2, Index 2: map_3, Index 3: map_4
-  // (wired into NarrativeController separately — content only here)
   const PRE_BATTLE_BANTER = [
     // Index 0 — map_1: Aldric and Zara
     [
       {
         speaker: 'Zara',
-        portrait: '◈',
-        portraitColor: '#ffd740',
-        glyph: '◈',
-        bgTint: 'rgba(20,15,0,0.5)',
+        portrait: '◈', portraitColor: '#ffd740',
+        glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
         text: "Before we go in — if I find anything valuable in these ruins, that's mine. Pre-agreed. Just so we're clear."
       },
       {
         speaker: 'Aldric',
-        portrait: '⚔',
-        portraitColor: '#4fc3f7',
-        glyph: '⚔',
-        bgTint: 'rgba(0,20,50,0.4)',
+        portrait: '⚔', portraitColor: '#4fc3f7',
+        glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
         text: "Nothing in there belongs to us until the job is done. After that — I'll consider it. Move out."
       },
     ],
@@ -4051,18 +4328,14 @@ const StoryScript = (() => {
     [
       {
         speaker: 'Lyra',
-        portrait: '✦',
-        portraitColor: '#b388ff',
-        glyph: '✦',
-        bgTint: 'rgba(20,0,50,0.4)',
+        portrait: '✦', portraitColor: '#b388ff',
+        glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
         text: "The resonance is stronger here. There's something in the causeway stone — trace enchantments, military-grade. The Founders built this road to last."
       },
       {
         speaker: 'Kael',
-        portrait: '†',
-        portraitColor: '#80cbc4',
-        glyph: '†',
-        bgTint: 'rgba(0,25,40,0.5)',
+        portrait: '†', portraitColor: '#80cbc4',
+        glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
         text: "Good. Then the ground won't shift under us. Focus on what's in front — the road can wait until after."
       },
     ],
@@ -4070,18 +4343,14 @@ const StoryScript = (() => {
     [
       {
         speaker: 'Zara',
-        portrait: '◈',
-        portraitColor: '#ffd740',
-        glyph: '◈',
-        bgTint: 'rgba(20,15,0,0.5)',
+        portrait: '◈', portraitColor: '#ffd740',
+        glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
         text: "Three walls, two chokepoints, one exit. You know who designs a passage like this? Someone who wanted it to be a slaughterhouse."
       },
       {
         speaker: 'Aldric',
-        portrait: '⚔',
-        portraitColor: '#4fc3f7',
-        glyph: '⚔',
-        bgTint: 'rgba(0,20,50,0.4)',
+        portrait: '⚔', portraitColor: '#4fc3f7',
+        glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
         text: "Then we don't give them time to use it that way. Pick a lane and commit — hesitation is what kills you here."
       },
     ],
@@ -4089,248 +4358,533 @@ const StoryScript = (() => {
     [
       {
         speaker: 'Kael',
-        portrait: '†',
-        portraitColor: '#80cbc4',
-        glyph: '†',
-        bgTint: 'rgba(0,25,40,0.5)',
+        portrait: '†', portraitColor: '#80cbc4',
+        glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
         text: "Shallows like this eat heavy armor. I'll take point — if the ground gives way, I'll find out first."
       },
       {
         speaker: 'Lyra',
-        portrait: '✦',
-        portraitColor: '#b388ff',
-        glyph: '✦',
-        bgTint: 'rgba(20,0,50,0.4)',
+        portrait: '✦', portraitColor: '#b388ff',
+        glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
         text: "Your dedication to suffering on our behalf is noted. Just don't drown — I'd rather not lose a paladin to a marsh."
       },
     ],
   ];
 
-  // ── Transition: map_2 → map_3 ────────────────────────────────
   const TRANSITION_2_3 = [
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "The causeway is ours. They're falling back into the passage — old iron walls, tight corridors. One wrong step and we're bottlenecked."
     },
     {
       speaker: 'Kael',
-      portrait: '✦',
-      portraitColor: '#80cbc4',
-      glyph: '†',
-      bgTint: 'rgba(0,25,40,0.5)',
+      portrait: '✦', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
       text: "Let them think the walls protect them. I'll take the front. Just keep Lyra out of the chokepoints — she's no good to us cornered."
     },
   ];
 
-  // ── Transition: map_3 → map_4 ────────────────────────────────
   const TRANSITION_3_4 = [
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(0,20,30,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(0,20,30,0.5)',
       text: "Passage is clear. But smell that? Marsh water. The ground ahead is rotting — half of it's underwater and the rest isn't far behind."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "Stay on the high ground. The shallows will slow us — but they'll slow them too. Pick your crossings carefully."
     },
   ];
 
-  // ── Transition: map_4 → map_5 ────────────────────────────────
   const TRANSITION_4_5 = [
     {
       speaker: 'Brute',
-      portrait: '⚡',
-      portraitColor: '#ef5350',
-      glyph: '⚡',
-      bgTint: 'rgba(40,10,0,0.6)',
+      portrait: '⚡', portraitColor: '#ef5350',
+      glyph: '⚡', bgTint: 'rgba(40,10,0,0.6)',
       text: "You made it through the shallows. Impressive. The escarpment ahead is ours — every ridge, every stone. Come up. We'll be waiting."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "He wants us rattled. Don't give him it. Uphill fights are won by patience — don't charge the ridge, flank it. Move."
     },
   ];
 
-  // ── Transition: map_5 → map_6 ────────────────────────────────
   const TRANSITION_5_6 = [
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "The escarpment is behind us. One more door. The Shattered Keep — whatever the Founders locked inside, we're about to find out why they didn't want it opened."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "The ley-line pulse is coming from inside those walls. It's strong — stronger than anything natural. Something in the keep is already awake."
     },
   ];
 
-  // ── PRE_BATTLE_3 — Ironhold Passage ──────────────────────────
   const PRE_BATTLE_3 = [
     {
       speaker: 'Kael',
-      portrait: '†',
-      portraitColor: '#80cbc4',
-      glyph: '†',
-      bgTint: 'rgba(0,25,40,0.5)',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
       text: "Iron walls, iron floors. The passage was built to funnel an army into a killing ground — three lanes, no room to maneuver. Once we commit to one, we can't pull back."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "Then we pick the right lane before we step in. Lyra — anything ahead? Zara — watch the walls. Ambush points in places like this are carved into the architecture."
     },
     {
       speaker: 'Darkwraith',
-      portrait: '☽',
-      portraitColor: '#9e47ff',
-      glyph: '☽',
-      bgTint: 'rgba(20,0,40,0.7)',
+      portrait: '☽', portraitColor: '#9e47ff',
+      glyph: '☽', bgTint: 'rgba(20,0,40,0.7)',
       text: "You hear it? The stone remembers every soldier who bled here. Take your time choosing your path — all three lanes lead to the same place. Me."
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: Ironhold Passage. Navigate the iron corridors. Neutralize all enemy forces."
     },
   ];
 
-  // ── PRE_BATTLE_4 — Thornmire Shallows ───────────────────────
   const PRE_BATTLE_4 = [
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "Wonderful. Nothing I love more than ankle-deep water with a sword in my hand. Which crossing are we taking? Because I count four, and three of them look like traps."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "The water itself carries an old enchantment — weighting, slowing, draining. It's not recent. Someone in the Founder's age seeded the marsh to stop exactly what we're trying to do."
     },
     {
       speaker: 'Zara',
-      portrait: '◈',
-      portraitColor: '#ffd740',
-      glyph: '◈',
-      bgTint: 'rgba(20,15,0,0.5)',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
       text: "So the ground was rigged four hundred years ago specifically to kill us. Somehow that's not even the strangest thing that's happened this week."
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: Thornmire Shallows. Cross the marsh. Eliminate all enemy units. Avoid the deep water."
     },
   ];
 
-  // ── PRE_BATTLE_5 — Verdant Escarpment ───────────────────────
   const PRE_BATTLE_5 = [
     {
       speaker: 'Brute',
-      portrait: '⚡',
-      portraitColor: '#ff6f00',
-      glyph: '⚡',
-      bgTint: 'rgba(40,10,0,0.6)',
+      portrait: '⚡', portraitColor: '#ff6f00',
+      glyph: '⚡', bgTint: 'rgba(40,10,0,0.6)',
       text: "Come on then. Every ridge up here is mine — I've held this escarpment for two days waiting for someone worth fighting. Don't disappoint me."
     },
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.4)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
       text: "He's not wrong — they have every high tile on the board. Attacking uphill into that is going to hurt. We need to force them off the ridge before we engage directly."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "We've been hurt before. High ground matters — it doesn't decide the fight. Stay tight, advance through the barriers, don't let them pick us apart in the open. We push together or not at all."
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: Verdant Escarpment. Assault the high ground. WARNING — enemy holds elevated advantage across the full front line."
     },
   ];
 
-  // ── PRE_BATTLE_6 — The Shattered Keep ───────────────────────
   const PRE_BATTLE_6 = [
     {
       speaker: 'Lyra',
-      portrait: '✦',
-      portraitColor: '#b388ff',
-      glyph: '✦',
-      bgTint: 'rgba(20,0,50,0.5)',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.5)',
       text: "The ley-lines inside that keep are fracturing. I've never read anything like this — it's as if the vault is pushing back against the walls holding it. Whatever is in there knows we're coming."
     },
     {
       speaker: 'Darkwraith',
-      portrait: '☽',
-      portraitColor: '#9e47ff',
-      glyph: '☽',
-      bgTint: 'rgba(20,0,40,0.8)',
+      portrait: '☽', portraitColor: '#9e47ff',
+      glyph: '☽', bgTint: 'rgba(20,0,40,0.8)',
       text: "You've come further than I expected. But the keep is the last threshold, and I am the last guardian. I will not move aside for curiosity — or for coin."
     },
     {
       speaker: 'Aldric',
-      portrait: '⚔',
-      portraitColor: '#4fc3f7',
-      glyph: '⚔',
-      bgTint: 'rgba(0,20,50,0.4)',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
       text: "We didn't cross a causeway, a marsh, a passage, and an escarpment to stop at a gate. Every one of us chose to be here. Whatever's waiting on the other side — we face it the same way we faced everything else. Together."
     },
     {
       speaker: '— SYSTEM —',
-      portrait: '◈',
-      portraitColor: 'var(--accent)',
-      glyph: '◈',
-      bgTint: 'rgba(0,30,40,0.6)',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
       text: "MISSION: The Shattered Keep. Final engagement. Breach the inner fortress. End it."
     },
   ];
 
-  return { INTRO, MID, OUTRO, DEFEAT_SCENE, PRE_BATTLE_BANTER, PRE_BATTLE_3, PRE_BATTLE_4, PRE_BATTLE_5, PRE_BATTLE_6, TRANSITION_2_3, TRANSITION_3_4, TRANSITION_4_5, TRANSITION_5_6 };
+  // ── ACT 2 SCENES ────────────────────────────────────────────
+
+  const ACT2_OPEN = [
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.5)',
+      text: "What came out of that vault wasn't a creature or a weapon. It was everything the Founders knew — and didn't want anyone else to know. I've been reading fragments for three days. It changes everything we understand about how this world works."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
+      text: "And now at least three different groups know we have it. The Compact pulled back but they didn't go home. I've counted four separate scouting patterns since dawn. Someone is coordinating them."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
+      text: "Then we don't stay still. The Ashfen Wood is dense enough to lose pursuit in. We move now, while it's dark, and we figure out who's behind this while we're moving."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "Agreed. Whatever this knowledge is — whatever it means — we don't hand it to anyone until we understand it ourselves. Move out."
+    },
+  ];
+
+  const RYNN_JOIN = [
+    {
+      speaker: '— —',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.6)',
+      text: "A figure drops from the tree line — fast, careful, hands visible. Not a threat. Not yet."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "I've been tracking that unit for six days. You just took them apart in twenty minutes. Either you're very good or you're carrying something that makes you very important — and from what I've seen, it's both."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
+      text: "Who are you and why were you tracking them?"
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "Rynn. Former courier for the Compact — until I delivered something I wasn't supposed to read and made the mistake of reading it anyway. Now they want me quiet and I want to stay loud. Seems like we have overlapping interests."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "You know the Compact's patrol patterns?"
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "Better than they do. I set half of them. Where are you headed?"
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "South. Away from whoever's coordinating this hunt. We'll explain the rest while we move."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◎', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "RYNN has joined the party."
+    },
+  ];
+
+  const ACT2_TRANSITION_1_2 = [
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "That smoke on the horizon — that's Cinder Hollow. Small village, river trade post. I've passed through twice. Good people."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
+      text: "That fire isn't accidental. The burn pattern is too even — someone set it deliberately to flush out anyone sheltering there. Or to send a message."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "If the Compact is ahead of us they've already searched it. But there may be survivors. We go through — not around."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Cinder Hollow. Navigate the burning village. Enemy forces are still present."
+    },
+  ];
+
+  const ACT2_TRANSITION_2_3 = [
+    {
+      speaker: 'Kael',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
+      text: "The village is gone. Whatever it was, it isn't anymore. Anyone who was here either got out or didn't."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "There's a tunnel network under the trade road — smugglers built it a generation ago. Compact doesn't know about it. I do. It runs south for two miles."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
+      text: "Of course you know about smuggler tunnels. Of course."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "They're not empty. Someone else had the same idea. But it's still our best option."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: The Sunken Road. Clear the tunnel network. Stay underground."
+    },
+  ];
+
+  const ACT2_SIDE1_PRE = [
+    {
+      speaker: '— —',
+      portrait: '◉', portraitColor: '#80cfa0',
+      glyph: '◉', bgTint: 'rgba(0,20,15,0.6)',
+      text: "A woman blocks the path. Not hostile — but not moving either. She has the look of someone who has been dealing with a problem alone for a very long time."
+    },
+    {
+      speaker: 'Eska',
+      portrait: '◉', portraitColor: '#80cfa0',
+      glyph: '◉', bgTint: 'rgba(0,20,15,0.5)',
+      text: "You feel that? The ground has been bleeding energy for three months. I've been patching the worst of it with what I know — which is less than I thought, apparently. Then a team of scholars shows up claiming they're here to study it. They're not studying it. They're harvesting it."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
+      text: "Conclave survey team. They'd map the rupture, extract what they can, and leave the land worse than they found it. Who are you?"
+    },
+    {
+      speaker: 'Eska',
+      portrait: '◉', portraitColor: '#80cfa0',
+      glyph: '◉', bgTint: 'rgba(0,20,15,0.5)',
+      text: "Someone who lives here. Get them off my land and I'll listen to whatever you need to tell me."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: The Ley Scar. Drive off the Conclave survey team. Protect Eska's territory."
+    },
+  ];
+
+  const ESKA_JOIN = [
+    {
+      speaker: 'Eska',
+      portrait: '◉', portraitColor: '#80cfa0',
+      glyph: '◉', bgTint: 'rgba(0,20,15,0.5)',
+      text: "The rupture is still there. Driving off the survey team bought time, not a solution. If what you're carrying is what caused this — or what could fix it — then I need to understand it. And you need someone who understands the land."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "We could use someone who knows this region. The Conclave has been one step ahead of us. That ends now."
+    },
+    {
+      speaker: 'Eska',
+      portrait: '◉', portraitColor: '#80cfa0',
+      glyph: '◉', bgTint: 'rgba(0,20,15,0.5)',
+      text: "I'm not joining your cause. I'm solving my problem. If those happen to be the same thing, we'll get along fine."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "ESKA has joined the party."
+    },
+  ];
+
+  const ACT2_TRANSITION_3_4 = [
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
+      text: "The soldiers in those tunnels weren't Compact. Different insignia, different equipment. More precise. Someone else is involved in this hunt."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "I've seen that insignia before. On a shipment I delivered eighteen months ago — to a Conclave holding house. I didn't know what the Conclave was then. I do now."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
+      text: "The Compact and the Conclave working together. That's not a coincidence — someone brokered that arrangement specifically to find us."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "The ridge ahead controls the southern passes. If they've fortified it we'll know just how organized this is. Move carefully."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: Thornback Ridge. Break through the fortified mountain pass. Conclave and Compact forces are operating together."
+    },
+  ];
+
+  const ACT2_TRANSITION_4_5 = [
+    {
+      speaker: 'Zara',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
+      text: "There was a man on that ridge — robes, not armor. He wasn't fighting. He was watching. When things went bad for them he just... left. Walked away."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.4)',
+      text: "Conclave operative. They don't fight unless they have to — they observe, assess, and report. Which means somewhere ahead there's a relay point. A place they send information back to. If we can reach it before he does—"
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.4)',
+      text: "We cut their communications. They can't coordinate what they can't communicate. Where is it?"
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "I know where their relay stations are. I used to deliver to them. Follow me."
+    },
+    {
+      speaker: '— SYSTEM —',
+      portrait: '◈', portraitColor: 'var(--accent)',
+      glyph: '◈', bgTint: 'rgba(0,30,40,0.6)',
+      text: "MISSION: The Relay Station. Destroy the Conclave communications outpost. Do not let Solen escape with the data."
+    },
+  ];
+
+  const ACT2_OUTRO = [
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,40,0.5)',
+      text: "The station is down. Whatever they were transmitting — it's stopped."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.5)',
+      text: "Solen was gone before we breached the inner room. He didn't run empty-handed — I can see the data extraction point. He took something. Not everything, but something."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.5)',
+      text: "He'll report back to the Conclave with whatever he managed to pull. They'll know we're not running anymore. They'll know we're fighting back."
+    },
+    {
+      speaker: 'Kael',
+      portrait: '†', portraitColor: '#80cbc4',
+      glyph: '†', bgTint: 'rgba(0,25,40,0.5)',
+      text: "Good. I'm tired of running."
+    },
+    {
+      speaker: 'Zara',
+      portrait: '◈', portraitColor: '#ffd740',
+      glyph: '◈', bgTint: 'rgba(20,15,0,0.5)',
+      text: "There's a third faction. The people in those tunnels weren't Compact or Conclave — different movement, different tactics. Someone else is circling this."
+    },
+    {
+      speaker: 'Lyra',
+      portrait: '✦', portraitColor: '#b388ff',
+      glyph: '✦', bgTint: 'rgba(20,0,50,0.5)',
+      text: "The Remnants. I've been finding references to them in the vault material. They existed before the Founders. Whatever was suppressed — they're the reason it had to be suppressed."
+    },
+    {
+      speaker: 'Aldric',
+      portrait: '⚔', portraitColor: '#4fc3f7',
+      glyph: '⚔', bgTint: 'rgba(0,20,50,0.5)',
+      text: "Then we find them before anyone else does. Whatever they know — we need to understand it. All of it. Move out."
+    },
+    {
+      speaker: '— ACT II COMPLETE —',
+      portrait: '◈', portraitColor: 'var(--gold)',
+      glyph: '◈', bgTint: 'rgba(0,0,0,0.92)',
+      text: "Aethermoor: Tactical Chronicles  ·  Act II — Flight  ·  To Be Continued"
+    },
+  ];
+
+  const ACT2_DEFEAT = [
+    {
+      speaker: 'Varek',
+      portrait: '!', portraitColor: '#e0a060',
+      glyph: '!', bgTint: 'rgba(30,15,0,0.7)',
+      text: "Stand down. You fought well — better than most who've tried to run from us. That counts for something. Not enough to let you keep what you're carrying, but something."
+    },
+    {
+      speaker: 'Solen',
+      portrait: ')', portraitColor: '#ce93d8',
+      glyph: '✦', bgTint: 'rgba(20,0,40,0.7)',
+      text: "The knowledge you took from that vault belongs in controlled hands. You have to understand that. The wrong people reading the wrong things at the wrong time — that's how civilizations end. We are not the enemy here."
+    },
+    {
+      speaker: 'Rynn',
+      portrait: '◎', portraitColor: '#a8d8a8',
+      glyph: '◎', bgTint: 'rgba(0,20,10,0.6)',
+      text: "That's exactly what someone who wants to control everything would say."
+    },
+  ];
+
+  return {
+    INTRO, MID, OUTRO, DEFEAT_SCENE,
+    PRE_BATTLE_BANTER, PRE_BATTLE_3, PRE_BATTLE_4, PRE_BATTLE_5, PRE_BATTLE_6,
+    TRANSITION_2_3, TRANSITION_3_4, TRANSITION_4_5, TRANSITION_5_6,
+    ACT2_OPEN, RYNN_JOIN, ACT2_TRANSITION_1_2, ACT2_TRANSITION_2_3,
+    ACT2_SIDE1_PRE, ESKA_JOIN, ACT2_TRANSITION_3_4, ACT2_TRANSITION_4_5,
+    ACT2_OUTRO, ACT2_DEFEAT,
+  };
 })();
 
 // =============================================================================
@@ -4351,31 +4905,36 @@ const NarrativeController = (() => {
   // ── Route player to the world map, then roster, then battle ──────────────
   function _goToWorldMap() {
     WorldMapScreen.show((nodeId) => {
-      // Player selected a node
       const node = WORLD_MAP_NODES[nodeId];
       if (!node) return;
 
       RosterScreen.show(
         node.label,
         (selectedIds) => {
-          // Player confirmed roster — record deploy and start battle
           SaveSystem.recordDeploy(nodeId, selectedIds);
           _startBattle(node.mapId, nodeId, selectedIds);
         },
         () => {
-          // Player pressed back — return to world map
           _goToWorldMap();
         }
       );
     });
   }
 
+  // ── Pre-battle scene data ─────────────────────────────────────────────────
+  const _act2PreBattle = {
+    'act2_m1': null, // ACT2_OPEN handles this map's intro
+    'act2_m2': null, // uses ACT2_TRANSITION_1_2 via victory handler
+    'act2_m3': null, // uses ACT2_TRANSITION_2_3 via victory handler
+    'act2_side1': StoryScript ? StoryScript.ACT2_SIDE1_PRE : null,
+    'act2_m4': null, // uses ACT2_TRANSITION_3_4 via victory handler
+    'act2_m5': null, // uses ACT2_TRANSITION_4_5 via victory handler
+  };
+
   function _startBattle(mapId, nodeId, deployedCharacterIds) {
-    // Load map with optional deploy list
     MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
 
-    // Reset turn state
     GameState.currentTurn = null;
     GameState.turnQueue = [];
     GameState.selectedUnit = null;
@@ -4398,29 +4957,43 @@ const NarrativeController = (() => {
     SoundSystem.startDrone();
     SoundSystem.play('battleStart');
 
-    // Pre-battle scenes: banter for maps 1–4, new scenes for maps 5–6.
-    // Maps 3 and 4 chain banter → pre-battle scene before starting.
     Renderer.draw();
-    const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
-    const _preBattleMap = { map_5: StoryScript.PRE_BATTLE_5, map_6: StoryScript.PRE_BATTLE_6 };
-    const _preBattle = _preBattleMap[mapId];
-    const _startTurn = () => { TurnSystem.start(); Renderer.draw(); };
 
-    if (mapId === 'map_3' || mapId === 'map_4') {
-      // Chain: existing banter → new pre-battle scene
-      const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
-      const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
-      CutsceneEngine.play(_banter, () => {
-        CutsceneEngine.play(_scene, _startTurn);
-      });
-    } else if (_banterIndex !== undefined && StoryScript.PRE_BATTLE_BANTER[_banterIndex]) {
-      // Maps 1 and 2 — banter only
-      CutsceneEngine.play(StoryScript.PRE_BATTLE_BANTER[_banterIndex], _startTurn);
-    } else if (_preBattle) {
-      // Maps 5 and 6 — new pre-battle only
-      CutsceneEngine.play(_preBattle, _startTurn);
+    // Check for act intro cutscene (plays once on first visit)
+    const actIntros = {
+      'act2_m1': { flag: 'act2_intro_played', scenes: StoryScript.ACT2_OPEN },
+    };
+    const intro = actIntros[mapId];
+
+    const _runBattleScenes = () => {
+      const _startTurn = () => { TurnSystem.start(); Renderer.draw(); };
+      const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
+      const _preBattleMap = {
+        map_5: StoryScript.PRE_BATTLE_5,
+        map_6: StoryScript.PRE_BATTLE_6
+      };
+
+      // Act 2 side mission has its own pre-battle scene
+      if(mapId === 'act2_side1'){
+        CutsceneEngine.play(StoryScript.ACT2_SIDE1_PRE, _startTurn);
+      } else if(mapId === 'map_3' || mapId === 'map_4'){
+        const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
+        const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
+        CutsceneEngine.play(_banter, () => { CutsceneEngine.play(_scene, _startTurn); });
+      } else if(_banterIndex !== undefined && StoryScript.PRE_BATTLE_BANTER[_banterIndex]){
+        CutsceneEngine.play(StoryScript.PRE_BATTLE_BANTER[_banterIndex], _startTurn);
+      } else if(_preBattleMap[mapId]){
+        CutsceneEngine.play(_preBattleMap[mapId], _startTurn);
+      } else {
+        _startTurn();
+      }
+    };
+
+    if(intro && !SaveSystem.getFlag(intro.flag)){
+      SaveSystem.setFlag(intro.flag);
+      CutsceneEngine.play(intro.scenes, _runBattleScenes);
     } else {
-      _startTurn();
+      _runBattleScenes();
     }
 
     // Update map button
@@ -4456,6 +5029,7 @@ const NarrativeController = (() => {
     }, 1800);
   }
 
+  // ── Act 1 victory handlers ─────────────────────────────────────────────────
   function _onMap1Victory() {
     SaveSystem.completeNode('act1_m1', 'main');
     SaveSystem.save();
@@ -4503,17 +5077,97 @@ const NarrativeController = (() => {
     }, 1800);
   }
 
+  // ── Act 2 victory handlers ─────────────────────────────────────────────────
+  function _onAct2M1Victory() {
+    SaveSystem.completeNode('act2_m1', 'main');
+    SaveSystem.recruitCharacter('rynn');
+    SaveSystem.setFlag('heard_of_ley_scar');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.RYNN_JOIN, () => {
+        _goToWorldMap();
+      });
+    }, 1800);
+  }
+
+  function _onAct2M2Victory() {
+    SaveSystem.completeNode('act2_m2', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_1_2);
+  }
+
+  function _onAct2M3Victory() {
+    SaveSystem.completeNode('act2_m3', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_2_3);
+  }
+
+  function _onAct2Side1Victory() {
+    SaveSystem.completeNode('act2_side1', 'side');
+    SaveSystem.recruitCharacter('eska');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ESKA_JOIN, () => {
+        _goToWorldMap();
+      });
+    }, 1800);
+  }
+
+  function _onAct2M4Victory() {
+    SaveSystem.completeNode('act2_m4', 'main');
+    SaveSystem.save();
+    _transition(StoryScript.ACT2_TRANSITION_3_4);
+  }
+
+  function _onAct2M5Victory() {
+    SaveSystem.completeNode('act2_m5', 'main');
+    SaveSystem.save();
+    SoundSystem.stopDrone();
+    SoundSystem.play('victory');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ACT2_OUTRO, () => {
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'ACT II COMPLETE';
+        o.querySelector('#end-title').style.color = 'var(--gold)';
+        o.querySelector('#end-message').textContent = 'Flight — The hunt continues.';
+        o.style.display = 'flex';
+      });
+    }, 1800);
+  }
+
+  // ── Defeat handlers ────────────────────────────────────────────────────────
   function _onDefeat() {
     SoundSystem.stopDrone();
     SoundSystem.play('defeat');
     setTimeout(() => {
       document.getElementById('end-overlay').style.display = 'none';
       CutsceneEngine.play(StoryScript.DEFEAT_SCENE, () => {
-        // Show the defeat screen after cutscene
         const o = document.getElementById('end-overlay');
         o.querySelector('#end-title').textContent = 'DEFEAT';
         o.querySelector('#end-title').style.color = '#ef5350';
         o.querySelector('#end-message').textContent = 'The ruins claim you.';
+        o.style.display = 'flex';
+      });
+    }, 800);
+  }
+
+  function _onAct2Defeat() {
+    SoundSystem.stopDrone();
+    SoundSystem.play('defeat');
+    setTimeout(() => {
+      document.getElementById('end-overlay').style.display = 'none';
+      CutsceneEngine.play(StoryScript.ACT2_DEFEAT, () => {
+        const o = document.getElementById('end-overlay');
+        o.querySelector('#end-title').textContent = 'DEFEAT';
+        o.querySelector('#end-title').style.color = '#ef5350';
+        o.querySelector('#end-message').textContent = 'The hunt catches up with you.';
         o.style.display = 'flex';
       });
     }, 800);
@@ -4531,12 +5185,23 @@ const NarrativeController = (() => {
         map_4: _onMap4Victory,
         map_5: _onMap5Victory,
         map_6: _onMap6Victory,
+        act2_m1: _onAct2M1Victory,
+        act2_m2: _onAct2M2Victory,
+        act2_m3: _onAct2M3Victory,
+        act2_side1: _onAct2Side1Victory,
+        act2_m4: _onAct2M4Victory,
+        act2_m5: _onAct2M5Victory,
       };
       const handler = routes[_currentAct];
       if (handler) handler();
     });
     GameEvents.on('battle:loss', () => {
-      _onDefeat();
+      const act2Maps = ['act2_m1','act2_m2','act2_m3','act2_side1','act2_m4','act2_m5'];
+      if(act2Maps.includes(_currentAct)){
+        _onAct2Defeat();
+      } else {
+        _onDefeat();
+      }
     });
   }
 
@@ -4545,14 +5210,12 @@ const NarrativeController = (() => {
     SoundSystem.play('click');
     _hideTitleScreen();
     setTimeout(() => {
-      // Initialize engine silently (without starting battle)
       const canvas = document.getElementById('game-canvas');
       MapSystem.load('map_1');
       Renderer.init(canvas);
       InputManager.attach(canvas, Renderer.getTileSize());
 
       _registerBattleEvents();
-      // Register core listeners from main engine
       registerCoreListeners();
 
       // Play intro cutscene then start battle (Act 1 map_1 needs no roster — linear)
@@ -4571,7 +5234,6 @@ const NarrativeController = (() => {
     _hideTitleScreen();
     setTimeout(() => {
       const canvas = document.getElementById('game-canvas');
-      // Load any map temporarily to initialize the engine
       MapSystem.load(saveData.mapId || 'map_1');
       Renderer.init(canvas);
       InputManager.attach(canvas, Renderer.getTileSize());
@@ -4579,7 +5241,6 @@ const NarrativeController = (() => {
       _registerBattleEvents();
       registerCoreListeners();
 
-      // Route to world map — player picks their next mission
       _goToWorldMap();
     }, 600);
   }
@@ -4621,7 +5282,6 @@ const NarrativeController = (() => {
         ctx.fillStyle = `rgba(180,220,255,${s.a.toFixed(2)})`;
         ctx.fill();
       });
-      // Horizontal scan line sweep
       const sweep = (Date.now() / 3000) % 1;
       const sg = ctx.createLinearGradient(0, sweep * c.height - 40, 0, sweep * c.height + 40);
       sg.addColorStop(0, 'rgba(0,229,255,0)');
@@ -4641,7 +5301,6 @@ const NarrativeController = (() => {
   }
 
   function _initTitleAnimation() {
-    // Animate title content in
     const content = document.getElementById('title-content');
     if (content) {
       content.style.opacity = '0';
