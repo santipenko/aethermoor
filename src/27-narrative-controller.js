@@ -31,16 +31,6 @@ const NarrativeController = (() => {
     });
   }
 
-  // ── Pre-battle scene data ─────────────────────────────────────────────────
-  const _act2PreBattle = {
-    'act2_m1': null, // ACT2_OPEN handles this map's intro
-    'act2_m2': null, // uses ACT2_TRANSITION_1_2 via victory handler
-    'act2_m3': null, // uses ACT2_TRANSITION_2_3 via victory handler
-    'act2_side1': StoryScript ? StoryScript.ACT2_SIDE1_PRE : null,
-    'act2_m4': null, // uses ACT2_TRANSITION_3_4 via victory handler
-    'act2_m5': null, // uses ACT2_TRANSITION_4_5 via victory handler
-  };
-
   function _startBattle(mapId, nodeId, deployedCharacterIds) {
     MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
@@ -80,13 +70,11 @@ const NarrativeController = (() => {
       const _banterIndex = { map_1:0, map_2:1, map_3:2, map_4:3 }[mapId];
       const _preBattleMap = {
         map_5: StoryScript.PRE_BATTLE_5,
-        map_6: StoryScript.PRE_BATTLE_6
+        map_6: StoryScript.PRE_BATTLE_6,
+        act2_side1: StoryScript.ACT2_SIDE1_PRE,
       };
 
-      // Act 2 side mission has its own pre-battle scene
-      if(mapId === 'act2_side1'){
-        CutsceneEngine.play(StoryScript.ACT2_SIDE1_PRE, _startTurn);
-      } else if(mapId === 'map_3' || mapId === 'map_4'){
+      if(mapId === 'map_3' || mapId === 'map_4'){
         const _banter = StoryScript.PRE_BATTLE_BANTER[_banterIndex];
         const _scene = mapId === 'map_3' ? StoryScript.PRE_BATTLE_3 : StoryScript.PRE_BATTLE_4;
         CutsceneEngine.play(_banter, () => { CutsceneEngine.play(_scene, _startTurn); });
@@ -206,13 +194,13 @@ const NarrativeController = (() => {
   function _onAct2M2Victory() {
     SaveSystem.completeNode('act2_m2', 'main');
     SaveSystem.save();
-    _transition(StoryScript.ACT2_TRANSITION_1_2);
+    _transition(StoryScript.ACT2_TRANSITION_2_3);
   }
 
   function _onAct2M3Victory() {
     SaveSystem.completeNode('act2_m3', 'main');
     SaveSystem.save();
-    _transition(StoryScript.ACT2_TRANSITION_2_3);
+    _transition(StoryScript.ACT2_TRANSITION_3_4);
   }
 
   function _onAct2Side1Victory() {
@@ -232,7 +220,7 @@ const NarrativeController = (() => {
   function _onAct2M4Victory() {
     SaveSystem.completeNode('act2_m4', 'main');
     SaveSystem.save();
-    _transition(StoryScript.ACT2_TRANSITION_3_4);
+    _transition(StoryScript.ACT2_TRANSITION_4_5);
   }
 
   function _onAct2M5Victory() {
