@@ -350,6 +350,13 @@ const CONFIG = {
       'Warden':     '#80cfa0',
       'Commander':  '#e0a060',
       'Arcanist':   '#ce93d8',
+      'Spellblade': '#80b4ff',
+      'Sentinel':   '#b0d0ff',
+      'Phantom':    '#d4aaff',
+      'Warlord':    '#ffb060',
+      'Sage':       '#c0a8ff',
+      'Invoker':    '#80ffb0',
+      'Reckoner':   '#ffd080',
     },
   },
   TERRAIN_MOVE_COST: { normal:1, high:1, obstacle:Infinity, water:Infinity, hazard:2 },
@@ -1413,6 +1420,7 @@ const VFXSystem = (() => {
         _spawn({ type:'impact_burst', startTime:now, duration:250, cx, cy, ts, color:'255,160,60' });
         break;
       case 'Fireball':
+      case 'Ley Weave':
         _spawn({ type:'fireball', startTime:now, duration:400, cx, cy, ts });
         break;
       case 'Heal':
@@ -1424,20 +1432,47 @@ const VFXSystem = (() => {
         _spawn({ type:'dark_wave', startTime:now, duration:400, ux, uy, cx, cy, ts });
         break;
       case 'Arrow Shot':
+      case 'Scout Shot':
         _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'150,230,120', ts });
         break;
       case 'Holy Lance':
         _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'255,245,180', ts });
         break;
       case 'Barrier':
+      case 'Cover':
+      case 'Fortify':
         _spawn({ type:'barrier_ring', startTime:now, duration:400, cx, cy, ts });
         break;
+      case 'Shield Wall':
+        _spawn({ type:'barrier_ring', startTime:now, duration:500, cx, cy, ts });
+        _spawn({ type:'barrier_ring', startTime:now+80, duration:500,
+          cx:(unit.x+0.5)*ts, cy:(unit.y+0.5)*ts, ts });
+        break;
       case 'Smoke Bomb':
+      case 'Vanish':
         _spawn({ type:'smoke', startTime:now, duration:500,
           cx: (unit.x + 0.5) * ts, cy: (unit.y + 0.5) * ts, ts });
         break;
       case 'Steal Mana':
         _spawn({ type:'steal_mana', startTime:now, duration:400, ux, uy, cx, cy, ts });
+        break;
+      case 'Root':
+      case 'Call Earth':
+        _spawn({ type:'root_tendrils', startTime:now, duration:500, cx, cy, ts });
+        break;
+      case 'Ley Pulse':
+        _spawn({ type:'ley_pulse', startTime:now, duration:450, cx, cy, ts });
+        break;
+      case 'Rally':
+      case 'Battle Cry':
+        _spawn({ type:'rally_burst', startTime:now, duration:400,
+          cx:(unit.x+0.5)*ts, cy:(unit.y+0.5)*ts, ts });
+        break;
+      case 'Suppress':
+      case 'Intimidate':
+      case 'Dispel':
+      case 'Foreknowledge':
+        _spawn({ type:'suppress_shroud', startTime:now, duration:500, cx, cy, ts });
         break;
     }
   }
@@ -1614,16 +1649,125 @@ const VFXSystem = (() => {
         }
         break;
       }
+
+      case 'root_tendrils': {
+        // Green tendrils rising from ground, spreading outward
+        const alpha = t < 0.7 ? 1 : 1-(t-0.7)/0.3;
+        const reach = t * v.ts * 0.55;
+        const tendrils = 5;
+        ctx.strokeStyle = `rgba(60,200,80,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+        ctx.lineCap = 'round';
+        for(let i=0; i<tendrils; i++){
+          const angle = (i/tendrils)*Math.PI*2 - Math.PI/2;
+          const wobble = Math.sin(t * Math.PI * 3 + i) * v.ts * 0.06;
+          ctx.beginPath();
+          ctx.moveTo(v.cx, v.cy + v.ts * 0.3);
+          ctx.quadraticCurveTo(
+            v.cx + Math.cos(angle)*reach*0.5 + wobble,
+            v.cy + Math.sin(angle)*reach*0.5,
+            v.cx + Math.cos(angle)*reach,
+            v.cy + Math.sin(angle)*reach - v.ts*0.1
+          );
+          ctx.stroke();
+        }
+        // Center glow
+        ctx.beginPath();
+        ctx.arc(v.cx, v.cy, v.ts*0.08, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(80,255,100,${alpha.toFixed(3)})`;
+        ctx.fill();
+        break;
+      }
+
+      case 'ley_pulse': {
+        // Expanding ring of arcane energy, teal/purple
+        const r1 = t * v.ts * 1.2;
+        const r2 = t * v.ts * 0.8;
+        const alpha = t < 0.65 ? 1 : 1-(t-0.65)/0.35;
+        // Outer ring
+        ctx.strokeStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, v.ts * 0.06);
+        ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r1, 0, Math.PI*2); ctx.stroke();
+        // Inner ring slightly delayed
+        if(t > 0.15){
+          const t2 = (t - 0.15) / 0.85;
+          const alpha2 = t2 < 0.65 ? 0.7 : 0.7*(1-(t2-0.65)/0.35);
+          ctx.strokeStyle = `rgba(160,100,255,${alpha2.toFixed(3)})`;
+          ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+          ctx.beginPath(); ctx.arc(v.cx, v.cy, r2*t2, 0, Math.PI*2); ctx.stroke();
+        }
+        // Core flash
+        if(t < 0.2){
+          const coreA = (1 - t/0.2) * 0.8;
+          ctx.beginPath(); ctx.arc(v.cx, v.cy, v.ts*0.25, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(120,240,255,${coreA.toFixed(3)})`; ctx.fill();
+        }
+        break;
+      }
+
+      case 'rally_burst': {
+        // Golden starburst radiating from caster outward
+        const alpha = 1 - t;
+        const r = t * v.ts * 1.0;
+        const rays = 10;
+        ctx.strokeStyle = `rgba(255,215,60,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffd740'; ctx.shadowBlur = 8;
+        for(let i=0; i<rays; i++){
+          const a = (i/rays)*Math.PI*2;
+          const inner = r*0.25, outer = r;
+          ctx.beginPath();
+          ctx.moveTo(v.cx + Math.cos(a)*inner, v.cy + Math.sin(a)*inner);
+          ctx.lineTo(v.cx + Math.cos(a)*outer, v.cy + Math.sin(a)*outer);
+          ctx.stroke();
+        }
+        // Warm center glow
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r*0.25, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,220,100,${(alpha*0.7).toFixed(3)})`; ctx.fill();
+        break;
+      }
+
+      case 'suppress_shroud': {
+        // Dark descending veil over target
+        const alpha = t < 0.5 ? t*1.8 : 1 - (t-0.5)*1.4;
+        const h = t * v.ts * 0.9;
+        // Descending dark rectangle
+        ctx.fillStyle = `rgba(40,0,80,${(alpha*0.7).toFixed(3)})`;
+        ctx.fillRect(v.cx - v.ts*0.4, v.cy - h, v.ts*0.8, h);
+        // Dark particles falling
+        const particles = 4;
+        for(let i=0; i<particles; i++){
+          const phase = (t + i/particles) % 1;
+          const px = v.cx + (i - particles/2) * v.ts * 0.18;
+          const py = v.cy - phase * v.ts * 0.7;
+          const palpha = phase < 0.8 ? 1 : 1-(phase-0.8)/0.2;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.max(2, v.ts*0.04), 0, Math.PI*2);
+          ctx.fillStyle = `rgba(160,60,255,${(palpha*alpha).toFixed(3)})`;
+          ctx.fill();
+        }
+        // Suppress icon flash
+        if(t < 0.3){
+          const iconA = (1 - t/0.3) * 0.9;
+          const iconFs = Math.max(12, Math.floor(v.ts * 0.35));
+          ctx.font = `bold ${iconFs}px serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = `rgba(180,80,255,${iconA.toFixed(3)})`;
+          ctx.fillText(')', v.cx, v.cy);
+        }
+        break;
+      }
     }
   }
 
   return { spawnForAbility, drawAll };
 })();
-
 // --- SECTION: Renderer ---
 const Renderer = (() => {
   let _canvas=null,_ctx=null,_ts=CONFIG.TILE_SIZE;
-  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡','Scout':'◎','Warden':'✦','Commander':'!','Arcanist':'✦'};
+  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡','Scout':'◎','Warden':'✦','Commander':'!','Arcanist':'✦','Spellblade':'✦','Sentinel':'◉','Phantom':'◎','Warlord':'!','Sage':'✦','Invoker':'❧','Reckoner':'◈'};
 
   function init(canvas){
     _canvas=canvas; _ctx=canvas.getContext('2d');
@@ -1716,7 +1860,7 @@ const Renderer = (() => {
     ctx.ellipse(cx,py+ts-5,rad*0.75,rad*0.22,0,0,Math.PI*2);
     ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
 
-    if(job==='Dark Knight'||job==='Berserker'||job==='Commander'){
+    if(job==='Dark Knight'||job==='Berserker'||job==='Commander'||job==='Warlord'){
       ctx.save();
       const spikes=6;
       const spikeOuter=rad+ts*0.13, spikeInner=rad+ts*0.04;
@@ -1737,7 +1881,7 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    if(job==='Archer'||job==='Thief'||job==='Scout'){
+    if(job==='Archer'||job==='Thief'||job==='Scout'||job==='Phantom'){
       ctx.save();
       ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
       ctx.setLineDash([2,2]);
@@ -1746,17 +1890,17 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    const effectiveRad = (job==='Archer'||job==='Thief'||job==='Scout') ? rad*0.92 : rad;
+    const effectiveRad = (job==='Archer'||job==='Thief'||job==='Scout'||job==='Phantom') ? rad*0.92 : rad;
     ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2);
     const g=ctx.createRadialGradient(cx-effectiveRad*0.3,cy-effectiveRad*0.3,effectiveRad*0.08,cx,cy,effectiveRad);
     g.addColorStop(0,isP?'#7bdcfc':'#f48880');
     g.addColorStop(1,isP?'#1565c0':'#b71c1c');
     ctx.fillStyle=g; ctx.fill();
 
-    if(job==='Knight'||job==='Paladin'){
+    if(job==='Knight'||job==='Paladin'||job==='Sentinel'){
       ctx.strokeStyle=accent; ctx.lineWidth=isSel?3.5:2.8;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
-    } else if(job==='Mage'||job==='Healer'||job==='Warden'){
+    } else if(job==='Mage'||job==='Healer'||job==='Warden'||job==='Sage'||job==='Invoker'||job==='Reckoner'){
       ctx.strokeStyle=tc; ctx.lineWidth=isSel?2.5:1.5;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
       ctx.save();
@@ -2143,8 +2287,71 @@ const JOBS = {
   'Thief':      { label:'Thief',      icon:'◈', baseStats:{ maxHp:80,  maxMp:40,  attack:14, defense:6,  speed:9, moveRange:5 }, abilities:['Attack','Steal Mana','Smoke Bomb','Wait'], description:'Swift rogue. High SPD and move range.' },
   'Paladin':    { label:'Paladin',    icon:'✦', baseStats:{ maxHp:120, maxMp:60,  attack:14, defense:18, speed:4, moveRange:3 }, abilities:['Attack','Holy Lance','Barrier','Wait'],    description:'Holy defender. High DEF, ranged strike.' },
   'Berserker':  { label:'Berserker',  icon:'⚡', baseStats:{ maxHp:130, maxMp:0,   attack:28, defense:7,  speed:5, moveRange:3 }, abilities:['Attack','Rampage','Wait'],                description:'Unstoppable berserker. Extreme ATK.' },
-};
 
+  // ── Advanced Jobs ───────────────────────────────────────────
+  'Spellblade': {
+    label: 'Spellblade', icon: '✦',
+    baseStats: {
+      maxHp: 110, maxMp: 60, attack: 20, defense: 12, speed: 6, moveRange: 3
+    },
+    abilities: ['Attack', 'Arcane Strike', 'Spellbreak', 'Wait'],
+    description: 'Melee fighter channeling magic through strikes. High ATK, hybrid stats.'
+  },
+
+  'Sentinel': {
+    label: 'Sentinel', icon: '◉',
+    baseStats: {
+      maxHp: 160, maxMp: 40, attack: 14, defense: 22, speed: 2, moveRange: 1
+    },
+    abilities: ['Attack', 'Cover', 'Fortify', 'Wait'],
+    description: 'Immovable defender. Extreme DEF and HP, protects adjacent allies.'
+  },
+
+  'Phantom': {
+    label: 'Phantom', icon: '◎',
+    baseStats: {
+      maxHp: 70, maxMp: 60, attack: 16, defense: 4, speed: 14, moveRange: 6
+    },
+    abilities: ['Attack', 'Phase Step', 'Mirage', 'Wait'],
+    description: 'Perfect mobility. Extreme SPD, can pass through enemies.'
+  },
+
+  'Warlord': {
+    label: 'Warlord', icon: '!',
+    baseStats: {
+      maxHp: 150, maxMp: 20, attack: 24, defense: 18, speed: 4, moveRange: 3
+    },
+    abilities: ['Attack', 'Intimidate', 'Battle Cry', 'Wait'],
+    description: 'Disciplined power. High ATK and DEF, inspires nearby allies.'
+  },
+
+  'Sage': {
+    label: 'Sage', icon: '✦',
+    baseStats: {
+      maxHp: 72, maxMp: 120, attack: 18, defense: 8, speed: 7, moveRange: 4
+    },
+    abilities: ['Attack', 'Ley Weave', 'Dispel', 'Wait'],
+    description: 'Arcane wisdom. Battlefield manipulation, extended AoE, terrain effects.'
+  },
+
+  'Invoker': {
+    label: 'Invoker', icon: '❧',
+    baseStats: {
+      maxHp: 82, maxMp: 90, attack: 14, defense: 10, speed: 5, moveRange: 3
+    },
+    abilities: ['Attack', 'Call Earth', 'Surge', 'Wait'],
+    description: 'Commands the land as a weapon. Environmental abilities, aggressive terrain.'
+  },
+
+  'Reckoner': {
+    label: 'Reckoner', icon: '◈',
+    baseStats: {
+      maxHp: 78, maxMp: 80, attack: 12, defense: 10, speed: 6, moveRange: 3
+    },
+    abilities: ['Attack', 'Foreknowledge', 'Historical Debt', 'Wait'],
+    description: 'Tactical historian. Predicts and negates enemy abilities.'
+  },
+};
 // --- SECTION: Ability Definitions ---
 const ABILITIES = {
   'Attack':     { id:'Attack',     name:'Attack',     icon:'⚔', power:10, mpCost:0,  range:1, targetType:'enemy', type:'damage', aoe:false, aoeTiles:null, statusEffect:null, statusChance:0,   pushBack:false, description:'Basic melee strike.' },
@@ -2199,6 +2406,26 @@ const ABILITIES = {
   'Shield Wall':{ id:'Shield Wall',name:'Shield Wall',icon:'◉', power:0,  mpCost:18, range:0, targetType:'self',  type:'shield_wall', aoe:false, aoeTiles:null, statusEffect:'shield', statusChance:1.0, pushBack:false, description:'Grant shield to self and adjacent allies. 18 MP.' },
 
   'Suppress':   { id:'Suppress',   name:'Suppress',   icon:')', power:0,  mpCost:20, range:3, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:1.0, pushBack:false, description:'Silence target for 2 turns. Cannot use abilities. 20 MP.' },
+
+  // ── Advanced job stub abilities ────────────────────────────
+  'Arcane Strike':   { id:'Arcane Strike',   name:'Arcane Strike',   icon:'✦', power:16, mpCost:8,  range:1, targetType:'enemy', type:'damage',   aoe:false, aoeTiles:null, statusEffect:null,        statusChance:0,   pushBack:false, description:'Melee strike infused with arcane energy. 8 MP.' },
+  'Spellbreak':      { id:'Spellbreak',      name:'Spellbreak',      icon:')', power:10, mpCost:10, range:1, targetType:'enemy', type:'damage',   aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:0.6, pushBack:false, description:'Strike that disrupts magical focus. May suppress. 10 MP.' },
+  'Cover':           { id:'Cover',           name:'Cover',           icon:'◉', power:0,  mpCost:10, range:1, targetType:'ally',  type:'buff',     aoe:false, aoeTiles:null, statusEffect:'shield',     statusChance:1.0, pushBack:false, description:'Grant shield to adjacent ally. 10 MP.' },
+  'Fortify':         { id:'Fortify',         name:'Fortify',         icon:'◉', power:0,  mpCost:14, range:0, targetType:'self',  type:'buff',     aoe:false, aoeTiles:null, statusEffect:'shield',     statusChance:1.0, pushBack:false, description:'Fortify self — gain shield and +4 defense for 2 turns. 14 MP.' },
+  'Phase Step':      { id:'Phase Step',      name:'Phase Step',      icon:'◎', power:8,  mpCost:10, range:2, targetType:'enemy', type:'damage',   aoe:false, aoeTiles:null, statusEffect:'slow',       statusChance:0.5, pushBack:false, description:'Rapid strike from unexpected angle. May slow. 10 MP.' },
+  'Mirage':          { id:'Mirage',          name:'Mirage',          icon:'◎', power:0,  mpCost:16, range:0, targetType:'self',  type:'buff',     aoe:false, aoeTiles:null, statusEffect:'hidden',     statusChance:1.0, pushBack:false, description:'Create a decoy — become hidden for 2 turns. 16 MP.' },
+  'Intimidate':      { id:'Intimidate',      name:'Intimidate',      icon:'!', power:0,  mpCost:12, range:2, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:0.7, pushBack:false, description:'Suppress target with overwhelming presence. 12 MP.' },
+  'Battle Cry':      { id:'Battle Cry',      name:'Battle Cry',      icon:'!', power:0,  mpCost:14, range:0, targetType:'self',  type:'rally',    aoe:false, aoeTiles:null, statusEffect:'rallied',    statusChance:1.0, pushBack:false, description:'Inspire adjacent allies — rally all nearby units. 14 MP.' },
+  'Ley Weave':       { id:'Ley Weave',       name:'Ley Weave',       icon:'✦', power:14, mpCost:18, range:4, targetType:'any',   type:'damage',   aoe:true,
+    aoeTiles:(tx,ty)=>{ const t=[]; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) t.push({x:tx+dx,y:ty+dy}); return t; },
+    statusEffect:null, statusChance:0, pushBack:false, description:'Extended AoE ley-line blast. Range 4, 1-tile radius. 18 MP.' },
+  'Dispel':          { id:'Dispel',          name:'Dispel',          icon:'✦', power:0,  mpCost:12, range:2, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:1.0, pushBack:false, description:'Strip target of active status effects and suppress. 12 MP.' },
+  'Call Earth':      { id:'Call Earth',      name:'Call Earth',      icon:'❧', power:10, mpCost:14, range:2, targetType:'enemy', type:'root',     aoe:false, aoeTiles:null, statusEffect:'rooted',     statusChance:1.0, pushBack:false, description:'Call the earth to seize a target. Root for 3 turns. 14 MP.' },
+  'Surge':           { id:'Surge',           name:'Surge',           icon:'❧', power:18, mpCost:16, range:1, targetType:'any',   type:'damage',   aoe:true,
+    aoeTiles:(tx,ty,caster)=>{ const t=[]; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(dx!==0||dy!==0) t.push({x:caster.x+dx,y:caster.y+dy}); return t; },
+    statusEffect:null, statusChance:0, pushBack:true, description:'Surge of natural force — AoE push-back around caster. 16 MP.' },
+  'Foreknowledge':   { id:'Foreknowledge',   name:'Foreknowledge',   icon:'◈', power:0,  mpCost:10, range:3, targetType:'enemy', type:'suppress', aoe:false, aoeTiles:null, statusEffect:'suppressed', statusChance:1.0, pushBack:false, description:'Predict and negate target ability for 2 turns. 10 MP.' },
+  'Historical Debt': { id:'Historical Debt', name:'Historical Debt', icon:'◈', power:22, mpCost:20, range:2, targetType:'enemy', type:'piercing', aoe:false, aoeTiles:null, statusEffect:'slow',       statusChance:0.8, pushBack:false, description:'Strike using knowledge of target weakness. Piercing, may slow. 20 MP.' },
 };
 // --- SECTION: Combat Math ---
 const CombatMath = {
@@ -3322,9 +3549,11 @@ const RosterScreen = (() => {
   let _onConfirm = null; // callback(selectedIds)
   let _onBack = null;    // callback()
   let _missionLabel = '';
+  let _expandedCardId = null; // id of currently expanded card, null if none
 
   function show(missionLabel, onConfirm, onBack) {
     _selectedIds = [];
+    _expandedCardId = null;
     _onConfirm = onConfirm;
     _onBack = onBack;
     _missionLabel = missionLabel;
@@ -3334,6 +3563,87 @@ const RosterScreen = (() => {
 
   function hide() {
     document.getElementById('roster-overlay').style.display = 'none';
+  }
+
+  function _renderJobOptions(ch, card) {
+    const jobs = SaveSystem.getAvailableJobsForCharacter(ch.id);
+    card.innerHTML = ''; // clear existing content
+
+    // Header row with character name and collapse button
+    const header = document.createElement('div');
+    header.style.cssText = `
+      display:flex;align-items:center;justify-content:space-between;
+      padding:10px 14px;
+      border-bottom:1px solid rgba(0,229,255,0.15);
+      font-family:'Courier New',monospace;
+    `;
+    header.innerHTML = `
+      <div style="font-size:clamp(10px,2.2vw,13px);color:var(--text);font-weight:bold;letter-spacing:0.1em;">
+        ${ch.id.charAt(0).toUpperCase() + ch.id.slice(1)} \u2014 Select Job
+      </div>
+      <div style="font-size:clamp(9px,1.8vw,11px);color:var(--text-dim);cursor:pointer;padding:4px 8px;">\u2715</div>
+    `;
+    header.querySelector('div:last-child').addEventListener('click', e => {
+      e.stopPropagation();
+      _expandedCardId = null;
+      _render();
+    });
+    header.querySelector('div:last-child').addEventListener('touchend', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      _expandedCardId = null;
+      _render();
+    });
+    card.appendChild(header);
+
+    // Job options
+    if (jobs.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = `padding:12px 14px;font-family:'Courier New',monospace;font-size:clamp(9px,1.8vw,11px);color:var(--text-dim);`;
+      empty.textContent = 'No jobs available.';
+      card.appendChild(empty);
+      return;
+    }
+
+    jobs.forEach(job => {
+      const row = document.createElement('div');
+      row.style.cssText = `
+        display:flex;align-items:center;justify-content:space-between;
+        padding:10px 14px;
+        border-bottom:1px solid rgba(0,229,255,0.06);
+        cursor:${job.isAvailable ? 'pointer' : 'default'};
+        opacity:${job.isAvailable ? '1' : '0.4'};
+        background:${job.isCurrent ? 'rgba(0,60,90,0.5)' : 'transparent'};
+        font-family:'Courier New',monospace;
+      `;
+
+      const lockHint = !job.isAvailable
+        ? (job.flagRequired && !SaveSystem.getFlag(job.flagRequired)
+            ? '\uD83D\uDD12 Story'
+            : `\uD83D\uDD12 Lv${job.levelRequired}`)
+        : '';
+
+      row.innerHTML = `
+        <div style="font-size:clamp(9px,2vw,12px);color:${job.isAvailable ? 'var(--text)' : 'var(--text-dim)'};letter-spacing:0.08em;">
+          ${job.isCurrent ? '\u25CF ' : ''}${job.jobKey}${job.isUnique ? ' \u2605' : ''}
+        </div>
+        <div style="font-size:clamp(8px,1.6vw,10px);color:${job.isAvailable ? 'var(--accent)' : 'var(--text-dim)'};letter-spacing:0.1em;">
+          ${job.isCurrent ? 'ACTIVE' : lockHint}
+        </div>
+      `;
+
+      if (job.isAvailable && !job.isCurrent) {
+        const _switchJob = () => {
+          SaveSystem.setCharacterJob(ch.id, job.jobId);
+          _expandedCardId = null;
+          _render();
+        };
+        row.addEventListener('click', e => { e.stopPropagation(); _switchJob(); });
+        row.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); _switchJob(); });
+      }
+
+      card.appendChild(row);
+    });
   }
 
   function _render() {
@@ -3346,43 +3656,49 @@ const RosterScreen = (() => {
     cardList.innerHTML = '';
 
     available.forEach(ch => {
-      // Find base unit for stats display
       const baseUnit = BASE_UNITS.find(u => u.id === ch.id);
       const job = ch.currentJob || ch.uniqueJob;
       const level = ch.level || 1;
-
       const isSelected = _selectedIds.includes(ch.id);
+      const isExpanded = _expandedCardId === ch.id;
 
       const card = document.createElement('div');
       card.id = `roster-card-${ch.id}`;
       card.style.cssText = `
-        display:flex;align-items:center;justify-content:space-between;
-        padding:12px 14px;
         border:1px solid ${isSelected ? 'var(--accent)' : 'rgba(0,229,255,0.15)'};
         background:${isSelected ? 'rgba(0,60,90,0.7)' : 'rgba(4,9,18,0.7)'};
-        cursor:pointer;
         font-family:'Courier New',monospace;
         transition:border 0.1s,background 0.1s;
       `;
 
-      const hp  = baseUnit ? baseUnit.maxHp : '?';
-      const mp  = baseUnit ? baseUnit.maxMp : '?';
-      const atk = baseUnit ? baseUnit.attack : '?';
-      const def = baseUnit ? baseUnit.defense : '?';
-      const spd = baseUnit ? baseUnit.speed : '?';
+      if (isExpanded) {
+        _renderJobOptions(ch, card);
+      } else {
+        card.style.cssText += 'cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;';
 
-      // Job icon lookup — mirrors ICON_CHARS in renderer
-      const JOB_ICONS = {
-        'knight':'⚔','vanguard_knight':'⚔','mage':'✦','arcanist':'✦',
-        'paladin':'†','thief':'◈','shadowblade':'◈','archer':'◎',
-        'dark_knight':'☽','healer':'✚','berserker':'⚡',
-        'scout':'◎','vanguard':'⚔','warden':'✦','surveyor':'◎',
-        'archivist':'✚','lorekeeper':'✦','artificer':'☽','inquisitor':'⚔',
-      };
-      const icon = JOB_ICONS[job] || '◈';
+        const hp  = baseUnit ? baseUnit.maxHp : '?';
+        const mp  = baseUnit ? baseUnit.maxMp : '?';
+        const atk = baseUnit ? baseUnit.attack : '?';
+        const def = baseUnit ? baseUnit.defense : '?';
+        const spd = baseUnit ? baseUnit.speed : '?';
 
-      card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:14px;">
+        const JOB_ICONS = {
+          'knight':'⚔','vanguard_knight':'⚔','mage':'✦','arcanist':'✦',
+          'paladin':'†','thief':'◈','shadowblade':'◈','archer':'◎',
+          'dark_knight':'☽','healer':'✚','berserker':'⚡',
+          'scout':'◎','vanguard':'⚔','warden':'✦','surveyor':'◎',
+          'archivist':'✚','lorekeeper':'✦','artificer':'☽','inquisitor':'⚔',
+          'spellblade':'✦','sentinel':'◉','phantom':'◎','warlord':'!',
+          'sage':'✦','invoker':'❧','reckoner':'◈',
+        };
+        const icon = JOB_ICONS[job] || '◈';
+        const displayName = ch.id.charAt(0).toUpperCase() + ch.id.slice(1);
+        const displayJob = SaveSystem.jobIdToKey ? SaveSystem.jobIdToKey(job) : job.toUpperCase();
+
+        // Main card content area (click to expand)
+        const mainArea = document.createElement('div');
+        mainArea.style.cssText = 'display:flex;align-items:center;gap:14px;flex:1;min-width:0;';
+        mainArea.innerHTML = `
           <div style="
             width:36px;height:36px;
             border-radius:50%;
@@ -3391,42 +3707,110 @@ const RosterScreen = (() => {
             font-size:16px;flex-shrink:0;
             border:2px solid ${isSelected ? 'var(--accent)' : 'rgba(0,229,255,0.3)'};
           ">${icon}</div>
-          <div>
+          <div style="min-width:0;">
             <div style="
               font-size:clamp(10px,2.2vw,13px);
               color:var(--text);
               letter-spacing:0.1em;
               font-weight:bold;
-            ">${ch.id.charAt(0).toUpperCase() + ch.id.slice(1)}</div>
+            ">${displayName}</div>
             <div style="
               font-size:clamp(8px,1.8vw,10px);
               color:var(--text-dim);
               letter-spacing:0.08em;
               margin-top:2px;
-            ">${job.toUpperCase()} · LV${level}</div>
+            ">${displayJob.toUpperCase()} \u00B7 LV${level}</div>
           </div>
-        </div>
-        <div style="
-          font-size:clamp(7px,1.6vw,9px);
-          color:var(--text-dim);
-          letter-spacing:0.06em;
-          text-align:right;
-          line-height:1.6;
-        ">
-          HP ${hp} · MP ${mp}<br>
-          ATK ${atk} · DEF ${def} · SPD ${spd}
-        </div>
-        <div style="
-          margin-left:12px;
-          font-size:clamp(9px,1.8vw,11px);
-          color:${isSelected ? 'var(--accent)' : 'var(--text-dim)'};
-          letter-spacing:0.1em;
-          flex-shrink:0;
-        ">${isSelected ? '● SEL' : '○'}</div>
-      `;
+          <div style="
+            font-size:clamp(7px,1.6vw,9px);
+            color:var(--text-dim);
+            letter-spacing:0.06em;
+            text-align:right;
+            line-height:1.6;
+            margin-left:auto;
+            padding-right:8px;
+          ">
+            HP ${hp} \u00B7 MP ${mp}<br>
+            ATK ${atk} \u00B7 DEF ${def} \u00B7 SPD ${spd}
+          </div>
+        `;
 
-      card.addEventListener('click', () => _toggleCharacter(ch.id));
-      card.addEventListener('touchend', e => { e.preventDefault(); _toggleCharacter(ch.id); });
+        // Job switch button
+        const jobBtn = document.createElement('div');
+        jobBtn.style.cssText = `
+          font-size:clamp(8px,1.6vw,10px);
+          color:var(--text-dim);
+          letter-spacing:0.08em;
+          cursor:pointer;
+          padding:4px 8px;
+          border:1px solid rgba(0,229,255,0.15);
+          border-radius:2px;
+          white-space:nowrap;
+          flex-shrink:0;
+          margin-left:4px;
+        `;
+        jobBtn.textContent = '\u25B8 JOB';
+        jobBtn.title = 'Switch job';
+
+        // Select button
+        const selBtn = document.createElement('div');
+        selBtn.style.cssText = `
+          margin-left:8px;
+          padding:6px 10px;
+          min-height:36px;
+          border:1px solid ${isSelected ? 'var(--accent)' : 'rgba(0,229,255,0.2)'};
+          color:${isSelected ? 'var(--accent)' : 'var(--text-dim)'};
+          font-size:clamp(8px,1.6vw,10px);
+          letter-spacing:0.1em;
+          cursor:pointer;
+          display:flex;align-items:center;
+          font-family:'Courier New',monospace;
+          flex-shrink:0;
+          border-radius:2px;
+        `;
+        selBtn.textContent = isSelected ? '\u25CF SEL' : '\u25CB';
+
+        // Expand on card main area click
+        mainArea.addEventListener('click', e => {
+          e.stopPropagation();
+          _expandedCardId = (_expandedCardId === ch.id) ? null : ch.id;
+          _render();
+        });
+        mainArea.addEventListener('touchend', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          _expandedCardId = (_expandedCardId === ch.id) ? null : ch.id;
+          _render();
+        });
+
+        // Job button click also expands
+        jobBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          _expandedCardId = (_expandedCardId === ch.id) ? null : ch.id;
+          _render();
+        });
+        jobBtn.addEventListener('touchend', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          _expandedCardId = (_expandedCardId === ch.id) ? null : ch.id;
+          _render();
+        });
+
+        // Select button toggles selection only
+        selBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          _toggleCharacter(ch.id);
+        });
+        selBtn.addEventListener('touchend', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          _toggleCharacter(ch.id);
+        });
+
+        card.appendChild(mainArea);
+        card.appendChild(jobBtn);
+        card.appendChild(selBtn);
+      }
 
       cardList.appendChild(card);
     });
@@ -3439,6 +3823,8 @@ const RosterScreen = (() => {
       if (_selectedIds.length >= 5) return; // cap at 5
       _selectedIds.push(characterId);
     }
+    _updateCount();
+    // Re-render only the count and confirm button, not full re-render
     _render();
   }
 
@@ -3587,110 +3973,211 @@ const SoundSystem = (() => {
 const SaveSystem = (() => {
   const KEY = 'aethermoor_save_v1';
 
+  // ── Job ID to JOBS key mapping ────────────────────────────────────────────
+  function _jobIdToKey(jobId) {
+    const map = {
+      'knight':          'Knight',
+      'mage':            'Mage',
+      'archer':          'Archer',
+      'dark_knight':     'Dark Knight',
+      'healer':          'Healer',
+      'thief':           'Thief',
+      'paladin':         'Paladin',
+      'berserker':       'Berserker',
+      'spellblade':      'Spellblade',
+      'sentinel':        'Sentinel',
+      'phantom':         'Phantom',
+      'warlord':         'Warlord',
+      'sage':            'Sage',
+      'invoker':         'Invoker',
+      'reckoner':        'Reckoner',
+      // unique jobs
+      'vanguard_knight': 'Vanguard Knight',
+      'arcanist':        'Arcanist',
+      'shadowblade':     'Shadowblade',
+      'scout':           'Scout',
+      'warden':          'Warden',
+      'vanguard':        'Vanguard',
+      'surveyor':        'Surveyor',
+      'archivist':       'Archivist',
+      'lorekeeper':      'Lorekeeper',
+      'artificer':       'Artificer',
+      'inquisitor':      'Inquisitor',
+    };
+    return map[jobId] || jobId;
+  }
+
   // ── Default roster — full 15-character initial state ─────────────────────
   const DEFAULT_ROSTER = {
     aldric: {
       id: 'aldric', recruited: true, available: true,
       uniqueJob: 'vanguard_knight', currentJob: 'knight',
-      unlockedJobs: ['knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'knight',     levelRequired: 1, flagRequired: null },
+        { jobId: 'paladin',    levelRequired: 5, flagRequired: null },
+        { jobId: 'spellblade', levelRequired: 1, flagRequired: 'aldric_spellblade_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 2, attack: 2, defense: 2, speed: 1 },
       equipment: []
     },
     lyra: {
       id: 'lyra', recruited: true, available: true,
       uniqueJob: 'arcanist', currentJob: 'mage',
-      unlockedJobs: ['mage'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'mage', levelRequired: 1, flagRequired: null },
+        { jobId: 'sage', levelRequired: 1, flagRequired: 'lyra_sage_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 6, attack: 3, defense: 1, speed: 1 },
       equipment: []
     },
     kael: {
       id: 'kael', recruited: true, available: true,
       uniqueJob: 'paladin', currentJob: 'paladin',
-      unlockedJobs: ['paladin', 'knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'paladin',  levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',   levelRequired: 1, flagRequired: null },
+        { jobId: 'sentinel', levelRequired: 1, flagRequired: 'kael_sentinel_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 9, mp: 3, attack: 2, defense: 3, speed: 1 },
       equipment: []
     },
     zara: {
       id: 'zara', recruited: true, available: true,
       uniqueJob: 'shadowblade', currentJob: 'thief',
-      unlockedJobs: ['thief'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'thief',   levelRequired: 1, flagRequired: null },
+        { jobId: 'archer',  levelRequired: 5, flagRequired: null },
+        { jobId: 'phantom', levelRequired: 1, flagRequired: 'zara_phantom_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 3, attack: 3, defense: 1, speed: 3 },
       equipment: []
     },
     rynn: {
       id: 'rynn', recruited: false, available: false,
       uniqueJob: 'scout', currentJob: 'scout',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'scout',  levelRequired: 1, flagRequired: null },
+        { jobId: 'archer', levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 2, attack: 2, defense: 1, speed: 4 },
       equipment: []
     },
     tobin: {
       id: 'tobin', recruited: false, available: false,
       uniqueJob: 'vanguard', currentJob: 'vanguard',
-      unlockedJobs: ['knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'vanguard', levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',   levelRequired: 1, flagRequired: null },
+        { jobId: 'warlord',  levelRequired: 1, flagRequired: 'tobin_warlord_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 1, attack: 3, defense: 2, speed: 1 },
       equipment: []
     },
     eska: {
       id: 'eska', recruited: false, available: false,
       uniqueJob: 'warden', currentJob: 'warden',
-      unlockedJobs: ['mage', 'healer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'warden',  levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',  levelRequired: 5, flagRequired: null },
+        { jobId: 'invoker', levelRequired: 1, flagRequired: 'eska_invoker_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 5, attack: 1, defense: 2, speed: 2 },
       equipment: []
     },
     sera: {
       id: 'sera', recruited: false, available: false,
       uniqueJob: 'surveyor', currentJob: 'surveyor',
-      unlockedJobs: ['archer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'surveyor', levelRequired: 1, flagRequired: null },
+        { jobId: 'archer',   levelRequired: 1, flagRequired: null },
+        { jobId: 'mage',     levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 4, attack: 2, defense: 1, speed: 2 },
       equipment: []
     },
     orin: {
       id: 'orin', recruited: false, available: false,
       uniqueJob: 'archivist', currentJob: 'archivist',
-      unlockedJobs: ['healer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'archivist', levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',    levelRequired: 1, flagRequired: null },
+        { jobId: 'reckoner',  levelRequired: 1, flagRequired: 'orin_reckoner_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 5, attack: 1, defense: 2, speed: 1 },
       equipment: []
     },
     cael: {
       id: 'cael', recruited: false, available: false,
       uniqueJob: 'lorekeeper', currentJob: 'lorekeeper',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'lorekeeper', levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',     levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 4, attack: 1, defense: 1, speed: 1 },
       equipment: []
     },
     maren: {
       id: 'maren', recruited: false, available: false,
       uniqueJob: 'artificer', currentJob: 'artificer',
-      unlockedJobs: ['dark_knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'artificer',   levelRequired: 1, flagRequired: null },
+        { jobId: 'dark_knight', levelRequired: 1, flagRequired: null },
+        { jobId: 'spellblade',  levelRequired: 1, flagRequired: 'maren_spellblade_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 4, attack: 2, defense: 1, speed: 2 },
       equipment: []
     },
     davan: {
       id: 'davan', recruited: false, available: false,
       uniqueJob: 'inquisitor', currentJob: 'inquisitor',
-      unlockedJobs: ['dark_knight', 'knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'inquisitor', levelRequired: 1, flagRequired: null },
+        { jobId: 'dark_knight',levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',     levelRequired: 1, flagRequired: null },
+        { jobId: 'berserker',  levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 7, mp: 3, attack: 3, defense: 2, speed: 1 },
       equipment: []
     },
     darkwraith: {
       id: 'darkwraith', recruited: false, available: false,
       uniqueJob: 'dark_knight', currentJob: 'dark_knight',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'dark_knight', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 4, attack: 4, defense: 2, speed: 2 },
       equipment: []
     },
     sister: {
       id: 'sister', recruited: false, available: false,
       uniqueJob: 'healer', currentJob: 'healer',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'healer', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 6, attack: 1, defense: 2, speed: 2 },
       equipment: []
     },
     brute: {
       id: 'brute', recruited: false, available: false,
       uniqueJob: 'berserker', currentJob: 'berserker',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'berserker', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 12, mp: 1, attack: 5, defense: 2, speed: 2 },
       equipment: []
     }
@@ -3719,7 +4206,6 @@ const SaveSystem = (() => {
     if (!data) data = {};
     for (const k of Object.keys(SAVE_DEFAULTS)) {
       if (!(k in data)) {
-        // Deep-copy the default value so mutations don't affect the template
         data[k] = JSON.parse(JSON.stringify(SAVE_DEFAULTS[k]));
       }
     }
@@ -3762,7 +4248,6 @@ const SaveSystem = (() => {
 
   function save() {
     const data = _applyDefaults(_readRaw());
-    // Overwrite the live combat fields with current GameState
     data.mapId = GameState.currentMapId;
     data.turnNumber = GameState.turnNumber;
     data.units = GameState.units.map(u => ({
@@ -3786,7 +4271,6 @@ const SaveSystem = (() => {
 
   function applyToState(saveData) {
     if (!saveData) return;
-    // Restore HP/MP
     for (const saved of saveData.units || []) {
       const u = GameState.units.find(x => x.id === saved.id);
       if (u) { u.hp = saved.hp; u.mp = saved.mp; }
@@ -3797,8 +4281,6 @@ const SaveSystem = (() => {
   // =========================================================================
   // NEW PUBLIC METHODS
   // =========================================================================
-
-  // ── Story flags ───────────────────────────────────────────────────────────
 
   function setFlag(flagName) {
     const data = _applyDefaults(_readRaw());
@@ -3811,23 +4293,17 @@ const SaveSystem = (() => {
     return data.flags[flagName] === true;
   }
 
-  // ── Deploy records ────────────────────────────────────────────────────────
-
   function recordDeploy(mapId, characterIds) {
     const data = _applyDefaults(_readRaw());
     data.deployRecords[mapId] = characterIds;
     _write(data);
   }
 
-  // ── World map nodes ───────────────────────────────────────────────────────
-
   function completeNode(mapId, type) {
     const data = _applyDefaults(_readRaw());
     data.worldMap[mapId] = { completed: true, type: type };
     _write(data);
   }
-
-  // ── Roster management ─────────────────────────────────────────────────────
 
   function recruitCharacter(characterId) {
     const data = _applyDefaults(_readRaw());
@@ -3866,13 +4342,15 @@ const SaveSystem = (() => {
       console.warn('[SaveSystem] unlockJob: unknown character:', characterId);
       return;
     }
-    if (!data.roster[characterId].unlockedJobs.includes(jobId)) {
-      data.roster[characterId].unlockedJobs.push(jobId);
+    // New schema: check if already present by jobId
+    const already = data.roster[characterId].unlockedJobs.some(j =>
+      (typeof j === 'string' ? j : j.jobId) === jobId
+    );
+    if (!already) {
+      data.roster[characterId].unlockedJobs.push({ jobId, levelRequired: 1, flagRequired: null });
     }
     _write(data);
   }
-
-  // ── XP and level-up ──────────────────────────────────────────────────────
 
   function addXP(characterId, amount) {
     const data = _applyDefaults(_readRaw());
@@ -3885,7 +4363,6 @@ const SaveSystem = (() => {
     const LEVEL_CAP = 20;
     ch.xp += amount;
 
-    // Handle potentially multiple level-ups
     let leveled = false;
     while (ch.level < LEVEL_CAP) {
       const threshold = _xpThreshold(ch.level);
@@ -3894,9 +4371,7 @@ const SaveSystem = (() => {
       ch.level++;
       leveled = true;
 
-      // Apply stat growth to roster entry
       const g = ch.statGrowth;
-      // Store grown stats on the roster entry so future loads can apply them
       if (!ch.grownStats) {
         ch.grownStats = { hp: 0, mp: 0, attack: 0, defense: 0, speed: 0 };
       }
@@ -3906,7 +4381,6 @@ const SaveSystem = (() => {
       ch.grownStats.defense  = (ch.grownStats.defense  || 0) + g.defense;
       ch.grownStats.speed    = (ch.grownStats.speed    || 0) + g.speed;
 
-      // Apply to live GameState unit if loaded
       if (typeof GameState !== 'undefined') {
         const liveUnit = GameState.units.find(u => u.id === characterId);
         if (liveUnit) {
@@ -3922,7 +4396,6 @@ const SaveSystem = (() => {
 
       console.log(`%c[SaveSystem] ${characterId} leveled up to ${ch.level}!`, 'color:#ffd740;font-weight:bold');
 
-      // Emit event if GameEvents is available
       if (typeof GameEvents !== 'undefined') {
         GameEvents.emit('CHARACTER_LEVELED', { characterId, newLevel: ch.level });
       }
@@ -3930,8 +4403,6 @@ const SaveSystem = (() => {
 
     _write(data);
   }
-
-  // ── Unlock condition evaluation ───────────────────────────────────────────
 
   function evaluateCondition(condition) {
     const data = _applyDefaults(_readRaw());
@@ -3975,11 +4446,37 @@ const SaveSystem = (() => {
     }
   }
 
-  // ── Roster query ──────────────────────────────────────────────────────────
-
   function getAvailableRoster() {
     const data = _applyDefaults(_readRaw());
     return Object.values(data.roster).filter(ch => ch.recruited && ch.available);
+  }
+
+  // ── New: available jobs for a character ───────────────────────────────────
+
+  function getAvailableJobsForCharacter(characterId) {
+    const data = _applyDefaults(_readRaw());
+    const ch = data.roster[characterId];
+    if (!ch) return [];
+
+    return ch.unlockedJobs.map(unlock => {
+      // Support both old string format and new object format
+      const jobId = (typeof unlock === 'string') ? unlock : unlock.jobId;
+      const levelRequired = (typeof unlock === 'string') ? 1 : (unlock.levelRequired || 1);
+      const flagRequired = (typeof unlock === 'string') ? null : (unlock.flagRequired || null);
+
+      return {
+        jobId,
+        jobKey: _jobIdToKey(jobId),
+        levelRequired,
+        flagRequired,
+        isAvailable: (
+          ch.level >= levelRequired &&
+          (flagRequired === null || data.flags[flagRequired] === true)
+        ),
+        isCurrent: ch.currentJob === jobId,
+        isUnique: ch.uniqueJob === jobId,
+      };
+    });
   }
 
   // =========================================================================
@@ -4054,6 +4551,8 @@ const SaveSystem = (() => {
     addXP,
     evaluateCondition,
     getAvailableRoster,
+    getAvailableJobsForCharacter,
+    jobIdToKey: _jobIdToKey,
 
     // Unlock conditions reference
     UNLOCK_CONDITIONS,
@@ -4921,6 +5420,58 @@ const NarrativeController = (() => {
     });
   }
 
+  // ── XP award system ───────────────────────────────────────────────────────
+  const XP_RATES = {
+    main:   50,
+    side:   35,
+    secret: 45,
+  };
+  const XP_PER_ENEMY = 10;
+
+  function _awardXP(nodeId) {
+    const node = WORLD_MAP_NODES[nodeId];
+    if (!node) return;
+
+    const missionXP = XP_RATES[node.type] || 50;
+    const enemiesDefeated = GameState.units.filter(u => u.team === 'enemy' && u.hp <= 0).length;
+    const bonusXP = enemiesDefeated * XP_PER_ENEMY;
+    const totalXP = missionXP + bonusXP;
+
+    // Award to all deployed player characters
+    const deployedIds = GameState.units
+      .filter(u => u.team === 'player')
+      .map(u => u.id);
+
+    const levelUps = [];
+    for (const charId of deployedIds) {
+      const beforeData = SaveSystem.load();
+      const beforeLevel = beforeData && beforeData.roster[charId] ? beforeData.roster[charId].level : 1;
+      SaveSystem.addXP(charId, totalXP);
+      const afterData = SaveSystem.load();
+      const afterLevel = afterData && afterData.roster[charId] ? afterData.roster[charId].level : 1;
+      if (afterLevel > beforeLevel) {
+        levelUps.push({ charId, newLevel: afterLevel });
+      }
+    }
+
+    // Show level-up floating texts
+    for (const { charId, newLevel } of levelUps) {
+      const unit = GameState.units.find(u => u.id === charId);
+      if (unit) {
+        GameState.floatingTexts.push({
+          x: unit.x, y: unit.y,
+          text: `LV${newLevel}!`,
+          color: '#ffd740',
+          age: 0, maxAge: 60
+        });
+      }
+    }
+
+    if (levelUps.length > 0) Renderer.draw();
+
+    console.log(`[XP] Awarded ${totalXP} XP to ${deployedIds.length} characters. Level-ups: ${levelUps.length}`);
+  }
+
   function _startBattle(mapId, nodeId, deployedCharacterIds) {
     MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
@@ -5019,36 +5570,42 @@ const NarrativeController = (() => {
 
   // ── Act 1 victory handlers ─────────────────────────────────────────────────
   function _onMap1Victory() {
+    _awardXP('act1_m1');
     SaveSystem.completeNode('act1_m1', 'main');
     SaveSystem.save();
     _transition(StoryScript.MID);
   }
 
   function _onMap2Victory() {
+    _awardXP('act1_m2');
     SaveSystem.completeNode('act1_m2', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_2_3);
   }
 
   function _onMap3Victory() {
+    _awardXP('act1_m3');
     SaveSystem.completeNode('act1_m3', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_3_4);
   }
 
   function _onMap4Victory() {
+    _awardXP('act1_m4');
     SaveSystem.completeNode('act1_m4', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_4_5);
   }
 
   function _onMap5Victory() {
+    _awardXP('act1_m5');
     SaveSystem.completeNode('act1_m5', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_5_6);
   }
 
   function _onMap6Victory() {
+    _awardXP('act1_m6');
     SaveSystem.completeNode('act1_m6', 'main');
     SoundSystem.stopDrone();
     SoundSystem.play('victory');
@@ -5067,6 +5624,7 @@ const NarrativeController = (() => {
 
   // ── Act 2 victory handlers ─────────────────────────────────────────────────
   function _onAct2M1Victory() {
+    _awardXP('act2_m1');
     SaveSystem.completeNode('act2_m1', 'main');
     SaveSystem.recruitCharacter('rynn');
     SaveSystem.setFlag('heard_of_ley_scar');
@@ -5082,18 +5640,21 @@ const NarrativeController = (() => {
   }
 
   function _onAct2M2Victory() {
+    _awardXP('act2_m2');
     SaveSystem.completeNode('act2_m2', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_2_3);
   }
 
   function _onAct2M3Victory() {
+    _awardXP('act2_m3');
     SaveSystem.completeNode('act2_m3', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_3_4);
   }
 
   function _onAct2Side1Victory() {
+    _awardXP('act2_side1');
     SaveSystem.completeNode('act2_side1', 'side');
     SaveSystem.recruitCharacter('eska');
     SaveSystem.save();
@@ -5108,12 +5669,14 @@ const NarrativeController = (() => {
   }
 
   function _onAct2M4Victory() {
+    _awardXP('act2_m4');
     SaveSystem.completeNode('act2_m4', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_4_5);
   }
 
   function _onAct2M5Victory() {
+    _awardXP('act2_m5');
     SaveSystem.completeNode('act2_m5', 'main');
     SaveSystem.save();
     SoundSystem.stopDrone();
@@ -5206,7 +5769,6 @@ const NarrativeController = (() => {
       _registerBattleEvents();
       registerCoreListeners();
 
-      // Play intro cutscene then start battle (Act 1 map_1 needs no roster — linear)
       CutsceneEngine.play(StoryScript.INTRO, () => {
         _startBattle('map_1', 'act1_m1', null);
       });
