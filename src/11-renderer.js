@@ -1,7 +1,7 @@
 // --- SECTION: Renderer ---
 const Renderer = (() => {
   let _canvas=null,_ctx=null,_ts=CONFIG.TILE_SIZE;
-  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡','Scout':'◎','Warden':'✦','Commander':'!','Arcanist':'✦'};
+  const ICON_CHARS={'Knight':'⚔','Mage':'✦','Archer':'◎','Dark Knight':'☽','Squire':'◈','Healer':'✚','Thief':'◈','Paladin':'†','Berserker':'⚡','Scout':'◎','Warden':'✦','Commander':'!','Arcanist':'✦','Spellblade':'✦','Sentinel':'◉','Phantom':'◎','Warlord':'!','Sage':'✦','Invoker':'❧','Reckoner':'◈'};
 
   function init(canvas){
     _canvas=canvas; _ctx=canvas.getContext('2d');
@@ -94,7 +94,7 @@ const Renderer = (() => {
     ctx.ellipse(cx,py+ts-5,rad*0.75,rad*0.22,0,0,Math.PI*2);
     ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
 
-    if(job==='Dark Knight'||job==='Berserker'||job==='Commander'){
+    if(job==='Dark Knight'||job==='Berserker'||job==='Commander'||job==='Warlord'){
       ctx.save();
       const spikes=6;
       const spikeOuter=rad+ts*0.13, spikeInner=rad+ts*0.04;
@@ -115,7 +115,7 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    if(job==='Archer'||job==='Thief'||job==='Scout'){
+    if(job==='Archer'||job==='Thief'||job==='Scout'||job==='Phantom'){
       ctx.save();
       ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
       ctx.setLineDash([2,2]);
@@ -124,17 +124,17 @@ const Renderer = (() => {
       ctx.restore();
     }
 
-    const effectiveRad = (job==='Archer'||job==='Thief'||job==='Scout') ? rad*0.92 : rad;
+    const effectiveRad = (job==='Archer'||job==='Thief'||job==='Scout'||job==='Phantom') ? rad*0.92 : rad;
     ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2);
     const g=ctx.createRadialGradient(cx-effectiveRad*0.3,cy-effectiveRad*0.3,effectiveRad*0.08,cx,cy,effectiveRad);
     g.addColorStop(0,isP?'#7bdcfc':'#f48880');
     g.addColorStop(1,isP?'#1565c0':'#b71c1c');
     ctx.fillStyle=g; ctx.fill();
 
-    if(job==='Knight'||job==='Paladin'){
+    if(job==='Knight'||job==='Paladin'||job==='Sentinel'){
       ctx.strokeStyle=accent; ctx.lineWidth=isSel?3.5:2.8;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
-    } else if(job==='Mage'||job==='Healer'||job==='Warden'){
+    } else if(job==='Mage'||job==='Healer'||job==='Warden'||job==='Sage'||job==='Invoker'||job==='Reckoner'){
       ctx.strokeStyle=tc; ctx.lineWidth=isSel?2.5:1.5;
       ctx.beginPath(); ctx.arc(cx,cy,effectiveRad,0,Math.PI*2); ctx.stroke();
       ctx.save();

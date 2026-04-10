@@ -5,110 +5,211 @@
 const SaveSystem = (() => {
   const KEY = 'aethermoor_save_v1';
 
+  // ── Job ID to JOBS key mapping ────────────────────────────────────────────
+  function _jobIdToKey(jobId) {
+    const map = {
+      'knight':          'Knight',
+      'mage':            'Mage',
+      'archer':          'Archer',
+      'dark_knight':     'Dark Knight',
+      'healer':          'Healer',
+      'thief':           'Thief',
+      'paladin':         'Paladin',
+      'berserker':       'Berserker',
+      'spellblade':      'Spellblade',
+      'sentinel':        'Sentinel',
+      'phantom':         'Phantom',
+      'warlord':         'Warlord',
+      'sage':            'Sage',
+      'invoker':         'Invoker',
+      'reckoner':        'Reckoner',
+      // unique jobs
+      'vanguard_knight': 'Vanguard Knight',
+      'arcanist':        'Arcanist',
+      'shadowblade':     'Shadowblade',
+      'scout':           'Scout',
+      'warden':          'Warden',
+      'vanguard':        'Vanguard',
+      'surveyor':        'Surveyor',
+      'archivist':       'Archivist',
+      'lorekeeper':      'Lorekeeper',
+      'artificer':       'Artificer',
+      'inquisitor':      'Inquisitor',
+    };
+    return map[jobId] || jobId;
+  }
+
   // ── Default roster — full 15-character initial state ─────────────────────
   const DEFAULT_ROSTER = {
     aldric: {
       id: 'aldric', recruited: true, available: true,
       uniqueJob: 'vanguard_knight', currentJob: 'knight',
-      unlockedJobs: ['knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'knight',     levelRequired: 1, flagRequired: null },
+        { jobId: 'paladin',    levelRequired: 5, flagRequired: null },
+        { jobId: 'spellblade', levelRequired: 1, flagRequired: 'aldric_spellblade_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 2, attack: 2, defense: 2, speed: 1 },
       equipment: []
     },
     lyra: {
       id: 'lyra', recruited: true, available: true,
       uniqueJob: 'arcanist', currentJob: 'mage',
-      unlockedJobs: ['mage'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'mage', levelRequired: 1, flagRequired: null },
+        { jobId: 'sage', levelRequired: 1, flagRequired: 'lyra_sage_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 6, attack: 3, defense: 1, speed: 1 },
       equipment: []
     },
     kael: {
       id: 'kael', recruited: true, available: true,
       uniqueJob: 'paladin', currentJob: 'paladin',
-      unlockedJobs: ['paladin', 'knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'paladin',  levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',   levelRequired: 1, flagRequired: null },
+        { jobId: 'sentinel', levelRequired: 1, flagRequired: 'kael_sentinel_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 9, mp: 3, attack: 2, defense: 3, speed: 1 },
       equipment: []
     },
     zara: {
       id: 'zara', recruited: true, available: true,
       uniqueJob: 'shadowblade', currentJob: 'thief',
-      unlockedJobs: ['thief'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'thief',   levelRequired: 1, flagRequired: null },
+        { jobId: 'archer',  levelRequired: 5, flagRequired: null },
+        { jobId: 'phantom', levelRequired: 1, flagRequired: 'zara_phantom_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 3, attack: 3, defense: 1, speed: 3 },
       equipment: []
     },
     rynn: {
       id: 'rynn', recruited: false, available: false,
       uniqueJob: 'scout', currentJob: 'scout',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'scout',  levelRequired: 1, flagRequired: null },
+        { jobId: 'archer', levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 2, attack: 2, defense: 1, speed: 4 },
       equipment: []
     },
     tobin: {
       id: 'tobin', recruited: false, available: false,
       uniqueJob: 'vanguard', currentJob: 'vanguard',
-      unlockedJobs: ['knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'vanguard', levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',   levelRequired: 1, flagRequired: null },
+        { jobId: 'warlord',  levelRequired: 1, flagRequired: 'tobin_warlord_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 1, attack: 3, defense: 2, speed: 1 },
       equipment: []
     },
     eska: {
       id: 'eska', recruited: false, available: false,
       uniqueJob: 'warden', currentJob: 'warden',
-      unlockedJobs: ['mage', 'healer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'warden',  levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',  levelRequired: 5, flagRequired: null },
+        { jobId: 'invoker', levelRequired: 1, flagRequired: 'eska_invoker_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 5, attack: 1, defense: 2, speed: 2 },
       equipment: []
     },
     sera: {
       id: 'sera', recruited: false, available: false,
       uniqueJob: 'surveyor', currentJob: 'surveyor',
-      unlockedJobs: ['archer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'surveyor', levelRequired: 1, flagRequired: null },
+        { jobId: 'archer',   levelRequired: 1, flagRequired: null },
+        { jobId: 'mage',     levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 4, attack: 2, defense: 1, speed: 2 },
       equipment: []
     },
     orin: {
       id: 'orin', recruited: false, available: false,
       uniqueJob: 'archivist', currentJob: 'archivist',
-      unlockedJobs: ['healer'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'archivist', levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',    levelRequired: 1, flagRequired: null },
+        { jobId: 'reckoner',  levelRequired: 1, flagRequired: 'orin_reckoner_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 5, attack: 1, defense: 2, speed: 1 },
       equipment: []
     },
     cael: {
       id: 'cael', recruited: false, available: false,
       uniqueJob: 'lorekeeper', currentJob: 'lorekeeper',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'lorekeeper', levelRequired: 1, flagRequired: null },
+        { jobId: 'healer',     levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 5, mp: 4, attack: 1, defense: 1, speed: 1 },
       equipment: []
     },
     maren: {
       id: 'maren', recruited: false, available: false,
       uniqueJob: 'artificer', currentJob: 'artificer',
-      unlockedJobs: ['dark_knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'artificer',   levelRequired: 1, flagRequired: null },
+        { jobId: 'dark_knight', levelRequired: 1, flagRequired: null },
+        { jobId: 'spellblade',  levelRequired: 1, flagRequired: 'maren_spellblade_unlocked' },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 4, attack: 2, defense: 1, speed: 2 },
       equipment: []
     },
     davan: {
       id: 'davan', recruited: false, available: false,
       uniqueJob: 'inquisitor', currentJob: 'inquisitor',
-      unlockedJobs: ['dark_knight', 'knight'], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'inquisitor', levelRequired: 1, flagRequired: null },
+        { jobId: 'dark_knight',levelRequired: 1, flagRequired: null },
+        { jobId: 'knight',     levelRequired: 1, flagRequired: null },
+        { jobId: 'berserker',  levelRequired: 5, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 7, mp: 3, attack: 3, defense: 2, speed: 1 },
       equipment: []
     },
     darkwraith: {
       id: 'darkwraith', recruited: false, available: false,
       uniqueJob: 'dark_knight', currentJob: 'dark_knight',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'dark_knight', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 8, mp: 4, attack: 4, defense: 2, speed: 2 },
       equipment: []
     },
     sister: {
       id: 'sister', recruited: false, available: false,
       uniqueJob: 'healer', currentJob: 'healer',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'healer', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 6, mp: 6, attack: 1, defense: 2, speed: 2 },
       equipment: []
     },
     brute: {
       id: 'brute', recruited: false, available: false,
       uniqueJob: 'berserker', currentJob: 'berserker',
-      unlockedJobs: [], xp: 0, level: 1,
+      unlockedJobs: [
+        { jobId: 'berserker', levelRequired: 1, flagRequired: null },
+      ],
+      xp: 0, level: 1,
       statGrowth: { hp: 12, mp: 1, attack: 5, defense: 2, speed: 2 },
       equipment: []
     }
@@ -137,7 +238,6 @@ const SaveSystem = (() => {
     if (!data) data = {};
     for (const k of Object.keys(SAVE_DEFAULTS)) {
       if (!(k in data)) {
-        // Deep-copy the default value so mutations don't affect the template
         data[k] = JSON.parse(JSON.stringify(SAVE_DEFAULTS[k]));
       }
     }
@@ -180,7 +280,6 @@ const SaveSystem = (() => {
 
   function save() {
     const data = _applyDefaults(_readRaw());
-    // Overwrite the live combat fields with current GameState
     data.mapId = GameState.currentMapId;
     data.turnNumber = GameState.turnNumber;
     data.units = GameState.units.map(u => ({
@@ -204,7 +303,6 @@ const SaveSystem = (() => {
 
   function applyToState(saveData) {
     if (!saveData) return;
-    // Restore HP/MP
     for (const saved of saveData.units || []) {
       const u = GameState.units.find(x => x.id === saved.id);
       if (u) { u.hp = saved.hp; u.mp = saved.mp; }
@@ -215,8 +313,6 @@ const SaveSystem = (() => {
   // =========================================================================
   // NEW PUBLIC METHODS
   // =========================================================================
-
-  // ── Story flags ───────────────────────────────────────────────────────────
 
   function setFlag(flagName) {
     const data = _applyDefaults(_readRaw());
@@ -229,23 +325,17 @@ const SaveSystem = (() => {
     return data.flags[flagName] === true;
   }
 
-  // ── Deploy records ────────────────────────────────────────────────────────
-
   function recordDeploy(mapId, characterIds) {
     const data = _applyDefaults(_readRaw());
     data.deployRecords[mapId] = characterIds;
     _write(data);
   }
 
-  // ── World map nodes ───────────────────────────────────────────────────────
-
   function completeNode(mapId, type) {
     const data = _applyDefaults(_readRaw());
     data.worldMap[mapId] = { completed: true, type: type };
     _write(data);
   }
-
-  // ── Roster management ─────────────────────────────────────────────────────
 
   function recruitCharacter(characterId) {
     const data = _applyDefaults(_readRaw());
@@ -284,13 +374,15 @@ const SaveSystem = (() => {
       console.warn('[SaveSystem] unlockJob: unknown character:', characterId);
       return;
     }
-    if (!data.roster[characterId].unlockedJobs.includes(jobId)) {
-      data.roster[characterId].unlockedJobs.push(jobId);
+    // New schema: check if already present by jobId
+    const already = data.roster[characterId].unlockedJobs.some(j =>
+      (typeof j === 'string' ? j : j.jobId) === jobId
+    );
+    if (!already) {
+      data.roster[characterId].unlockedJobs.push({ jobId, levelRequired: 1, flagRequired: null });
     }
     _write(data);
   }
-
-  // ── XP and level-up ──────────────────────────────────────────────────────
 
   function addXP(characterId, amount) {
     const data = _applyDefaults(_readRaw());
@@ -303,7 +395,6 @@ const SaveSystem = (() => {
     const LEVEL_CAP = 20;
     ch.xp += amount;
 
-    // Handle potentially multiple level-ups
     let leveled = false;
     while (ch.level < LEVEL_CAP) {
       const threshold = _xpThreshold(ch.level);
@@ -312,9 +403,7 @@ const SaveSystem = (() => {
       ch.level++;
       leveled = true;
 
-      // Apply stat growth to roster entry
       const g = ch.statGrowth;
-      // Store grown stats on the roster entry so future loads can apply them
       if (!ch.grownStats) {
         ch.grownStats = { hp: 0, mp: 0, attack: 0, defense: 0, speed: 0 };
       }
@@ -324,7 +413,6 @@ const SaveSystem = (() => {
       ch.grownStats.defense  = (ch.grownStats.defense  || 0) + g.defense;
       ch.grownStats.speed    = (ch.grownStats.speed    || 0) + g.speed;
 
-      // Apply to live GameState unit if loaded
       if (typeof GameState !== 'undefined') {
         const liveUnit = GameState.units.find(u => u.id === characterId);
         if (liveUnit) {
@@ -340,7 +428,6 @@ const SaveSystem = (() => {
 
       console.log(`%c[SaveSystem] ${characterId} leveled up to ${ch.level}!`, 'color:#ffd740;font-weight:bold');
 
-      // Emit event if GameEvents is available
       if (typeof GameEvents !== 'undefined') {
         GameEvents.emit('CHARACTER_LEVELED', { characterId, newLevel: ch.level });
       }
@@ -348,8 +435,6 @@ const SaveSystem = (() => {
 
     _write(data);
   }
-
-  // ── Unlock condition evaluation ───────────────────────────────────────────
 
   function evaluateCondition(condition) {
     const data = _applyDefaults(_readRaw());
@@ -393,11 +478,37 @@ const SaveSystem = (() => {
     }
   }
 
-  // ── Roster query ──────────────────────────────────────────────────────────
-
   function getAvailableRoster() {
     const data = _applyDefaults(_readRaw());
     return Object.values(data.roster).filter(ch => ch.recruited && ch.available);
+  }
+
+  // ── New: available jobs for a character ───────────────────────────────────
+
+  function getAvailableJobsForCharacter(characterId) {
+    const data = _applyDefaults(_readRaw());
+    const ch = data.roster[characterId];
+    if (!ch) return [];
+
+    return ch.unlockedJobs.map(unlock => {
+      // Support both old string format and new object format
+      const jobId = (typeof unlock === 'string') ? unlock : unlock.jobId;
+      const levelRequired = (typeof unlock === 'string') ? 1 : (unlock.levelRequired || 1);
+      const flagRequired = (typeof unlock === 'string') ? null : (unlock.flagRequired || null);
+
+      return {
+        jobId,
+        jobKey: _jobIdToKey(jobId),
+        levelRequired,
+        flagRequired,
+        isAvailable: (
+          ch.level >= levelRequired &&
+          (flagRequired === null || data.flags[flagRequired] === true)
+        ),
+        isCurrent: ch.currentJob === jobId,
+        isUnique: ch.uniqueJob === jobId,
+      };
+    });
   }
 
   // =========================================================================
@@ -472,6 +583,8 @@ const SaveSystem = (() => {
     addXP,
     evaluateCondition,
     getAvailableRoster,
+    getAvailableJobsForCharacter,
+    jobIdToKey: _jobIdToKey,
 
     // Unlock conditions reference
     UNLOCK_CONDITIONS,

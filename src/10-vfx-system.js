@@ -18,6 +18,7 @@ const VFXSystem = (() => {
         _spawn({ type:'impact_burst', startTime:now, duration:250, cx, cy, ts, color:'255,160,60' });
         break;
       case 'Fireball':
+      case 'Ley Weave':
         _spawn({ type:'fireball', startTime:now, duration:400, cx, cy, ts });
         break;
       case 'Heal':
@@ -29,20 +30,47 @@ const VFXSystem = (() => {
         _spawn({ type:'dark_wave', startTime:now, duration:400, ux, uy, cx, cy, ts });
         break;
       case 'Arrow Shot':
+      case 'Scout Shot':
         _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'150,230,120', ts });
         break;
       case 'Holy Lance':
         _spawn({ type:'line_shot', startTime:now, duration:300, ux, uy, cx, cy, color:'255,245,180', ts });
         break;
       case 'Barrier':
+      case 'Cover':
+      case 'Fortify':
         _spawn({ type:'barrier_ring', startTime:now, duration:400, cx, cy, ts });
         break;
+      case 'Shield Wall':
+        _spawn({ type:'barrier_ring', startTime:now, duration:500, cx, cy, ts });
+        _spawn({ type:'barrier_ring', startTime:now+80, duration:500,
+          cx:(unit.x+0.5)*ts, cy:(unit.y+0.5)*ts, ts });
+        break;
       case 'Smoke Bomb':
+      case 'Vanish':
         _spawn({ type:'smoke', startTime:now, duration:500,
           cx: (unit.x + 0.5) * ts, cy: (unit.y + 0.5) * ts, ts });
         break;
       case 'Steal Mana':
         _spawn({ type:'steal_mana', startTime:now, duration:400, ux, uy, cx, cy, ts });
+        break;
+      case 'Root':
+      case 'Call Earth':
+        _spawn({ type:'root_tendrils', startTime:now, duration:500, cx, cy, ts });
+        break;
+      case 'Ley Pulse':
+        _spawn({ type:'ley_pulse', startTime:now, duration:450, cx, cy, ts });
+        break;
+      case 'Rally':
+      case 'Battle Cry':
+        _spawn({ type:'rally_burst', startTime:now, duration:400,
+          cx:(unit.x+0.5)*ts, cy:(unit.y+0.5)*ts, ts });
+        break;
+      case 'Suppress':
+      case 'Intimidate':
+      case 'Dispel':
+      case 'Foreknowledge':
+        _spawn({ type:'suppress_shroud', startTime:now, duration:500, cx, cy, ts });
         break;
     }
   }
@@ -219,9 +247,118 @@ const VFXSystem = (() => {
         }
         break;
       }
+
+      case 'root_tendrils': {
+        // Green tendrils rising from ground, spreading outward
+        const alpha = t < 0.7 ? 1 : 1-(t-0.7)/0.3;
+        const reach = t * v.ts * 0.55;
+        const tendrils = 5;
+        ctx.strokeStyle = `rgba(60,200,80,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+        ctx.lineCap = 'round';
+        for(let i=0; i<tendrils; i++){
+          const angle = (i/tendrils)*Math.PI*2 - Math.PI/2;
+          const wobble = Math.sin(t * Math.PI * 3 + i) * v.ts * 0.06;
+          ctx.beginPath();
+          ctx.moveTo(v.cx, v.cy + v.ts * 0.3);
+          ctx.quadraticCurveTo(
+            v.cx + Math.cos(angle)*reach*0.5 + wobble,
+            v.cy + Math.sin(angle)*reach*0.5,
+            v.cx + Math.cos(angle)*reach,
+            v.cy + Math.sin(angle)*reach - v.ts*0.1
+          );
+          ctx.stroke();
+        }
+        // Center glow
+        ctx.beginPath();
+        ctx.arc(v.cx, v.cy, v.ts*0.08, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(80,255,100,${alpha.toFixed(3)})`;
+        ctx.fill();
+        break;
+      }
+
+      case 'ley_pulse': {
+        // Expanding ring of arcane energy, teal/purple
+        const r1 = t * v.ts * 1.2;
+        const r2 = t * v.ts * 0.8;
+        const alpha = t < 0.65 ? 1 : 1-(t-0.65)/0.35;
+        // Outer ring
+        ctx.strokeStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, v.ts * 0.06);
+        ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r1, 0, Math.PI*2); ctx.stroke();
+        // Inner ring slightly delayed
+        if(t > 0.15){
+          const t2 = (t - 0.15) / 0.85;
+          const alpha2 = t2 < 0.65 ? 0.7 : 0.7*(1-(t2-0.65)/0.35);
+          ctx.strokeStyle = `rgba(160,100,255,${alpha2.toFixed(3)})`;
+          ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+          ctx.beginPath(); ctx.arc(v.cx, v.cy, r2*t2, 0, Math.PI*2); ctx.stroke();
+        }
+        // Core flash
+        if(t < 0.2){
+          const coreA = (1 - t/0.2) * 0.8;
+          ctx.beginPath(); ctx.arc(v.cx, v.cy, v.ts*0.25, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(120,240,255,${coreA.toFixed(3)})`; ctx.fill();
+        }
+        break;
+      }
+
+      case 'rally_burst': {
+        // Golden starburst radiating from caster outward
+        const alpha = 1 - t;
+        const r = t * v.ts * 1.0;
+        const rays = 10;
+        ctx.strokeStyle = `rgba(255,215,60,${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.5, v.ts * 0.04);
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffd740'; ctx.shadowBlur = 8;
+        for(let i=0; i<rays; i++){
+          const a = (i/rays)*Math.PI*2;
+          const inner = r*0.25, outer = r;
+          ctx.beginPath();
+          ctx.moveTo(v.cx + Math.cos(a)*inner, v.cy + Math.sin(a)*inner);
+          ctx.lineTo(v.cx + Math.cos(a)*outer, v.cy + Math.sin(a)*outer);
+          ctx.stroke();
+        }
+        // Warm center glow
+        ctx.beginPath(); ctx.arc(v.cx, v.cy, r*0.25, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,220,100,${(alpha*0.7).toFixed(3)})`; ctx.fill();
+        break;
+      }
+
+      case 'suppress_shroud': {
+        // Dark descending veil over target
+        const alpha = t < 0.5 ? t*1.8 : 1 - (t-0.5)*1.4;
+        const h = t * v.ts * 0.9;
+        // Descending dark rectangle
+        ctx.fillStyle = `rgba(40,0,80,${(alpha*0.7).toFixed(3)})`;
+        ctx.fillRect(v.cx - v.ts*0.4, v.cy - h, v.ts*0.8, h);
+        // Dark particles falling
+        const particles = 4;
+        for(let i=0; i<particles; i++){
+          const phase = (t + i/particles) % 1;
+          const px = v.cx + (i - particles/2) * v.ts * 0.18;
+          const py = v.cy - phase * v.ts * 0.7;
+          const palpha = phase < 0.8 ? 1 : 1-(phase-0.8)/0.2;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.max(2, v.ts*0.04), 0, Math.PI*2);
+          ctx.fillStyle = `rgba(160,60,255,${(palpha*alpha).toFixed(3)})`;
+          ctx.fill();
+        }
+        // Suppress icon flash
+        if(t < 0.3){
+          const iconA = (1 - t/0.3) * 0.9;
+          const iconFs = Math.max(12, Math.floor(v.ts * 0.35));
+          ctx.font = `bold ${iconFs}px serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = `rgba(180,80,255,${iconA.toFixed(3)})`;
+          ctx.fillText(')', v.cx, v.cy);
+        }
+        break;
+      }
     }
   }
 
   return { spawnForAbility, drawAll };
 })();
-

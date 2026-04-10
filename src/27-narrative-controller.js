@@ -31,6 +31,58 @@ const NarrativeController = (() => {
     });
   }
 
+  // ── XP award system ───────────────────────────────────────────────────────
+  const XP_RATES = {
+    main:   50,
+    side:   35,
+    secret: 45,
+  };
+  const XP_PER_ENEMY = 10;
+
+  function _awardXP(nodeId) {
+    const node = WORLD_MAP_NODES[nodeId];
+    if (!node) return;
+
+    const missionXP = XP_RATES[node.type] || 50;
+    const enemiesDefeated = GameState.units.filter(u => u.team === 'enemy' && u.hp <= 0).length;
+    const bonusXP = enemiesDefeated * XP_PER_ENEMY;
+    const totalXP = missionXP + bonusXP;
+
+    // Award to all deployed player characters
+    const deployedIds = GameState.units
+      .filter(u => u.team === 'player')
+      .map(u => u.id);
+
+    const levelUps = [];
+    for (const charId of deployedIds) {
+      const beforeData = SaveSystem.load();
+      const beforeLevel = beforeData && beforeData.roster[charId] ? beforeData.roster[charId].level : 1;
+      SaveSystem.addXP(charId, totalXP);
+      const afterData = SaveSystem.load();
+      const afterLevel = afterData && afterData.roster[charId] ? afterData.roster[charId].level : 1;
+      if (afterLevel > beforeLevel) {
+        levelUps.push({ charId, newLevel: afterLevel });
+      }
+    }
+
+    // Show level-up floating texts
+    for (const { charId, newLevel } of levelUps) {
+      const unit = GameState.units.find(u => u.id === charId);
+      if (unit) {
+        GameState.floatingTexts.push({
+          x: unit.x, y: unit.y,
+          text: `LV${newLevel}!`,
+          color: '#ffd740',
+          age: 0, maxAge: 60
+        });
+      }
+    }
+
+    if (levelUps.length > 0) Renderer.draw();
+
+    console.log(`[XP] Awarded ${totalXP} XP to ${deployedIds.length} characters. Level-ups: ${levelUps.length}`);
+  }
+
   function _startBattle(mapId, nodeId, deployedCharacterIds) {
     MapSystem.load(mapId, deployedCharacterIds || null);
     _currentAct = mapId;
@@ -129,36 +181,42 @@ const NarrativeController = (() => {
 
   // ── Act 1 victory handlers ─────────────────────────────────────────────────
   function _onMap1Victory() {
+    _awardXP('act1_m1');
     SaveSystem.completeNode('act1_m1', 'main');
     SaveSystem.save();
     _transition(StoryScript.MID);
   }
 
   function _onMap2Victory() {
+    _awardXP('act1_m2');
     SaveSystem.completeNode('act1_m2', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_2_3);
   }
 
   function _onMap3Victory() {
+    _awardXP('act1_m3');
     SaveSystem.completeNode('act1_m3', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_3_4);
   }
 
   function _onMap4Victory() {
+    _awardXP('act1_m4');
     SaveSystem.completeNode('act1_m4', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_4_5);
   }
 
   function _onMap5Victory() {
+    _awardXP('act1_m5');
     SaveSystem.completeNode('act1_m5', 'main');
     SaveSystem.save();
     _transition(StoryScript.TRANSITION_5_6);
   }
 
   function _onMap6Victory() {
+    _awardXP('act1_m6');
     SaveSystem.completeNode('act1_m6', 'main');
     SoundSystem.stopDrone();
     SoundSystem.play('victory');
@@ -177,6 +235,7 @@ const NarrativeController = (() => {
 
   // ── Act 2 victory handlers ─────────────────────────────────────────────────
   function _onAct2M1Victory() {
+    _awardXP('act2_m1');
     SaveSystem.completeNode('act2_m1', 'main');
     SaveSystem.recruitCharacter('rynn');
     SaveSystem.setFlag('heard_of_ley_scar');
@@ -192,18 +251,21 @@ const NarrativeController = (() => {
   }
 
   function _onAct2M2Victory() {
+    _awardXP('act2_m2');
     SaveSystem.completeNode('act2_m2', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_2_3);
   }
 
   function _onAct2M3Victory() {
+    _awardXP('act2_m3');
     SaveSystem.completeNode('act2_m3', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_3_4);
   }
 
   function _onAct2Side1Victory() {
+    _awardXP('act2_side1');
     SaveSystem.completeNode('act2_side1', 'side');
     SaveSystem.recruitCharacter('eska');
     SaveSystem.save();
@@ -218,12 +280,14 @@ const NarrativeController = (() => {
   }
 
   function _onAct2M4Victory() {
+    _awardXP('act2_m4');
     SaveSystem.completeNode('act2_m4', 'main');
     SaveSystem.save();
     _transition(StoryScript.ACT2_TRANSITION_4_5);
   }
 
   function _onAct2M5Victory() {
+    _awardXP('act2_m5');
     SaveSystem.completeNode('act2_m5', 'main');
     SaveSystem.save();
     SoundSystem.stopDrone();
@@ -316,7 +380,6 @@ const NarrativeController = (() => {
       _registerBattleEvents();
       registerCoreListeners();
 
-      // Play intro cutscene then start battle (Act 1 map_1 needs no roster — linear)
       CutsceneEngine.play(StoryScript.INTRO, () => {
         _startBattle('map_1', 'act1_m1', null);
       });
