@@ -21,6 +21,52 @@ const MapSystem = (() => {
     return map;
   }
 
+  function _applyJobToUnit(unit, charId) {
+    // Read save data — returns null if no save exists
+    const saveData = SaveSystem.load();
+    if (!saveData || !saveData.roster) return;
+
+    const rosterEntry = saveData.roster[charId];
+    if (!rosterEntry) return;
+
+    // Resolve current job ID — fall back gracefully if not set
+    const jobId = rosterEntry.currentJob || null;
+    if (!jobId) return;
+
+    // Convert slug to JOBS key ('knight' → 'Knight', 'dark_knight' → 'Dark Knight')
+    const jobKey = SaveSystem.jobIdToKey(jobId);
+    const jobDef = JOBS[jobKey];
+    if (!jobDef) return;
+
+    // Apply job base stats
+    const bs = jobDef.baseStats;
+    unit.maxHp    = bs.maxHp;
+    unit.maxMp    = bs.maxMp;
+    unit.attack   = bs.attack;
+    unit.defense  = bs.defense;
+    unit.speed    = bs.speed;
+    unit.moveRange = bs.moveRange;
+
+    // Apply accumulated level growth on top of job base stats
+    const grown = rosterEntry.grownStats;
+    if (grown) {
+      unit.maxHp    += (grown.hp       || 0);
+      unit.maxMp    += (grown.mp       || 0);
+      unit.attack   += (grown.attack   || 0);
+      unit.defense  += (grown.defense  || 0);
+      unit.speed    += (grown.speed    || 0);
+      // moveRange is not part of statGrowth — job base value is authoritative
+    }
+
+    // Apply job abilities
+    unit.abilities = [...jobDef.abilities];
+
+    // Update job display name
+    unit.job = jobKey;
+
+    // HP and MP will be reset to maxHp/maxMp by the caller after this function returns
+  }
+
   function load(mapId, deployedCharacterIds) {
     const def = MAP_DEFINITIONS[mapId];
     if (!def) { console.error('[MapSystem] Unknown map:', mapId); return; }
@@ -56,8 +102,22 @@ const MapSystem = (() => {
 
     GameState.units = unitsToLoad.map(template => {
       const override = allStarts.find(s => s.id === template.id);
-      const u = Object.assign({}, template, { statusEffects:[], hp:template.maxHp, mp:template.maxMp });
+      // Build base unit — stats and abilities from template first
+      const u = Object.assign({}, template, { statusEffects:[] });
+
+      // Apply current job from save data for player units
+      // This overwrites stats and abilities before HP/MP are set
+      if (u.team === 'player') {
+        _applyJobToUnit(u, u.id);
+      }
+
+      // Reset HP and MP to current maximums (post-job-application)
+      u.hp = u.maxHp;
+      u.mp = u.maxMp;
+
+      // Apply map start position override
       if (override) { u.x = override.x; u.y = override.y; }
+
       return u;
     });
 
